@@ -1,0 +1,32 @@
+#dat files
+*.dat
+
+# Temporal backups
+*~
+
+# pyc
+*.pyc
+
+# Python pickles
+*.pkl
+
+# Matlab .mat files
+*.mat
+
+# Binaries
+*.o
+*.so
+
+# Build and lib directories
+build/*
+lib/*
+lib64/*
+
+# Fits directory
+fits_cognition/*
+*.tar
+*.tar.gz
+
+# Cluster job files
+*.qsub
+*.sbatch

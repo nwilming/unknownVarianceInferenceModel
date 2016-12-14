@@ -1,0 +1,23 @@
+raw_data_dir: ./raw_data_dir/
+
+begin experiment TestExperimentName
+	tp: 0.
+	ISI: 0.04
+	T: 5.
+	iti: 3. 
+	dt: 1e-3
+	reward: 1
+	penalty: 0
+	n: 101
+	# external_var can be a float or a list of floats (e.g. [10.,20.,30.])
+	external_var: 1000. # The external_var units must be stimulus variance over time (e.g. contrast**2/s).
+	rt_cutoff: 
+	distractor: 0.
+	forced_non_decision_time: 0.
+	# prior_var_prob is only used if external_var is a list.
+	# It represents the prior probability of each variance.
+	# The probabilities are normalized when they are loaded.
+	prior_var_prob: [0.3,0.3,0.3]
+	rt_measured_from_stim_end: False # If False, rt are measured from stim start. If true, they are measured from the stim end
+	time_available_to_respond: inf
+end experiment TestExperimentName
