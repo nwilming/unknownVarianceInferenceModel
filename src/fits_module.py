@@ -1168,47 +1168,16 @@ _fit_output = {_fit_output}
 			self.set_fit_arguments(fit_arguments)
 		
 		minimizer = self.init_minimizer(self.start_point,self.bounds,self.optimizer_kwargs)
-		if self.experiment=='Luminancia':
-			if self.method=='full':
-				merit_function = self.full_merit
-			elif self.method=='confidence_only':
-				merit_function = self.confidence_only_merit
-			elif self.method=='full_confidence':
-				merit_function = self.full_confidence_merit
-			elif self.method=='binary_confidence_only':
-				merit_function = self.binary_confidence_only_merit
-			elif self.method=='full_binary_confidence':
-				merit_function = self.full_binary_confidence_merit
-			else:
-				raise ValueError('Unknown method "{0}" for experiment "{1}"'.format(self.method,self.experiment))
-		elif self.experiment=='2AFC':
-			if self.method=='full':
-				merit_function = self.full_merit
-			elif self.method=='confidence_only':
-				merit_function = self.confidence_only_merit
-			elif self.method=='full_confidence':
-				merit_function = self.full_confidence_merit
-			elif self.method=='binary_confidence_only':
-				merit_function = self.binary_confidence_only_merit
-			elif self.method=='full_binary_confidence':
-				merit_function = self.full_binary_confidence_merit
-			else:
-				raise ValueError('Unknown method "{0}" for experiment "{1}"'.format(self.method,self.experiment))
-		elif self.experiment=='Auditivo':
-			if self.method=='full':
-				merit_function = self.full_merit
-			elif self.method=='confidence_only':
-				merit_function = self.confidence_only_merit
-			elif self.method=='full_confidence':
-				merit_function = self.full_confidence_merit
-			elif self.method=='binary_confidence_only':
-				merit_function = self.binary_confidence_only_merit
-			elif self.method=='full_binary_confidence':
-				merit_function = self.full_binary_confidence_merit
-			else:
-				raise ValueError('Unknown method "{0}" for experiment "{1}"'.format(self.method,self.experiment))
-		else:
-			raise ValueError('Unknown experiment "{0}"'.format(self.experiment))
+		if self.method=='full':
+			merit_function = self.full_merit
+		elif self.method=='confidence_only':
+			merit_function = self.confidence_only_merit
+		elif self.method=='full_confidence':
+			merit_function = self.full_confidence_merit
+		elif self.method=='binary_confidence_only':
+			merit_function = self.binary_confidence_only_merit
+		elif self.method=='full_binary_confidence':
+			merit_function = self.full_binary_confidence_merit
 		self.__fit_internals__ = None
 		self._fit_output = minimizer(merit_function)
 		self.__fit_internals__ = None
