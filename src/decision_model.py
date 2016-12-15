@@ -2,9 +2,9 @@
 #-*- coding: UTF-8 -*-
 
 """
-Decision Policy package
+Decision Model package
 
-Defines the DecisionPolicy class, which computes the decision bounds,
+Defines the DecisionModel class, which computes the decision bounds,
 belief values, maps belief and accumulated evidence, computes first
 passage time probability distributions, convolutions with non-decision
 time and belief to confidence mappings. This class implements the entire
@@ -28,7 +28,7 @@ except Exception:
 	print("cost_time.py requires the c++ compiled extension lib dp.so available")
 	raise
 
-class DecisionPolicy():
+class DecisionModel():
 	"""
 	Class that implements the dynamic programming method that optimizes
 	reward rate and computes the optimal decision bounds
@@ -40,7 +40,7 @@ class DecisionPolicy():
 		"""
 		Constructor input:
 		model_var = True variance rate of the process that generates samples.
-			If the variance is unknown by the DecisionPolicy, the model_var
+			If the variance is unknown by the DecisionModel, the model_var
 			can be a numpy.ndarray specifying posible values. Notice that
 			in this case, the prior_var_prob must be a numpy.ndarray of the
 			same shape as model_var. If model_var is None, its value is
@@ -215,7 +215,7 @@ bounds = {bounds}
 	
 	def copy(self):
 		model_var = copy.deepcopy(self.model_var)
-		out = DecisionPolicy(model_var=copy.deepcopy(self.model_var),
+		out = DecisionModel(model_var=copy.deepcopy(self.model_var),
 							internal_var=copy.deepcopy(self.internal_var),
 							external_var=copy.deepcopy(self.external_var),
 							prior_mu_mean=self.prior_mu_mean,prior_mu_var=self.prior_mu_var,
@@ -244,7 +244,7 @@ bounds = {bounds}
 	
 	def set_cost(self,cost):
 		"""
-		This function constructs a DecisionPolicy's cost array of shape
+		This function constructs a DecisionModel's cost array of shape
 		(nT-1,).
 		
 		Syntax:
@@ -256,7 +256,7 @@ bounds = {bounds}
 			of its values equal to the supplied float.
 			 If cost is a numpy ndarray, the cost array is constructed
 			in one of two ways. If the supplied cost's shape is equal to
-			(nT-1,) then the array is copied as is to the DecisionPolicy's
+			(nT-1,) then the array is copied as is to the DecisionModel's
 			cost array. If the shape is not equal, then the supplied array
 			is assumed to hold the coefficients of a polynomial and
 			the cost array is constructed as a polyval(cost,self.t[:-1]).
@@ -469,7 +469,7 @@ bounds = {bounds}
 		Input:
 			first_passage_time: First passage time probability density.
 				A numpy array of shape (2,self.nT) that can be the
-				result of np.array(cost_time.DecisionPolicy.rt())
+				result of np.array(cost_time.DecisionModel.rt())
 			confidence_response: The output from self.confidence_mapping(...)
 			dead_time_convolver: The output from self.get_dead_time_convolver(...)
 			confidence_partition: An int that is passed to fpt_conf_matrix
@@ -865,9 +865,9 @@ def _test():
 	out = dp.testsuite()
 	dict1,dict2,dict3,t,cx,cg1,cg2,cg3,cdg1,cdg2,cdg3,cx1,cx2,cx3 = out
 	dict1['T'] = dict2['T'] = dict3['T'] = 3.
-	d1 = DecisionPolicy(**dict1)
-	d2 = DecisionPolicy(**dict2)
-	d3 = DecisionPolicy(**dict3)
+	d1 = DecisionModel(**dict1)
+	d2 = DecisionModel(**dict2)
+	d3 = DecisionModel(**dict3)
 	d1.set_internal_var(10.)
 	d2.set_internal_var(10.)
 	d3.set_internal_var(10.)

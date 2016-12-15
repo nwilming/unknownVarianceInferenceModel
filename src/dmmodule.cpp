@@ -1,6 +1,6 @@
 /***
 Python C++ extension that provides an interface between the c++
-DecisionPolicy.cpp and cost_time.py package
+decision_model.cpp and decision_model.py package
 
 Author: Luciano Paz
 Year: 2016
@@ -14,12 +14,12 @@ Year: 2016
 #define PyArray_SHAPE PyArray_DIMS
 #endif
 #undef CUSTOM_NPY_1_7_API_VERSION
-#include "DecisionPolicy.hpp"
+#include "decision_model.hpp"
 
 #include <cmath>
 #include <cstdio>
 
-DecisionPolicyDescriptor* get_descriptor(PyObject* py_dp){
+DecisionModelDescriptor* get_descriptor(PyObject* py_dp){
 	int prior_type;
 	int n_model_var = 1;
 	bool known_variance;
@@ -42,7 +42,7 @@ DecisionPolicyDescriptor* get_descriptor(PyObject* py_dp){
 		Py_XDECREF(py_model_var);
 	} else {
 		if (PyArray_NDIM((PyArrayObject*)py_model_var)!=1){
-			PyErr_SetString(PyExc_ValueError,"DecisionPolicy instance's attribute 'model_var' must be a float or a 1D numpy array.");
+			PyErr_SetString(PyExc_ValueError,"DecisionModel instance's attribute 'model_var' must be a float or a 1D numpy array.");
 			Py_XDECREF(py_model_var);
 			return NULL;
 		} else {
@@ -56,22 +56,22 @@ DecisionPolicyDescriptor* get_descriptor(PyObject* py_dp){
 				py_prior_var_prob = PyObject_GetAttrString(py_dp,"prior_var_prob");
 				if (py_prior_var_prob==NULL){
 					Py_XDECREF(py_model_var);
-					PyErr_SetString(PyExc_AttributeError,"DecisionPolicy with unknown variance must have attribute 'prior_var_prob'. No such attribute was found.");
+					PyErr_SetString(PyExc_AttributeError,"DecisionModel with unknown variance must have attribute 'prior_var_prob'. No such attribute was found.");
 					return NULL;
 				} else if (!PyArray_Check(py_prior_var_prob)){
 					Py_XDECREF(py_model_var);
 					Py_XDECREF(py_prior_var_prob);
-					PyErr_SetString(PyExc_ValueError,"DecisionPolicy instance's attribute 'prior_var_prob' must be a 1D numpy array.");
+					PyErr_SetString(PyExc_ValueError,"DecisionModel instance's attribute 'prior_var_prob' must be a 1D numpy array.");
 					return NULL;
 				} else if (PyArray_NDIM((PyArrayObject*)py_prior_var_prob)!=1){
 					Py_XDECREF(py_model_var);
 					Py_XDECREF(py_prior_var_prob);
-					PyErr_SetString(PyExc_ValueError,"DecisionPolicy instance's attribute 'prior_var_prob' must be a 1D numpy array.");
+					PyErr_SetString(PyExc_ValueError,"DecisionModel instance's attribute 'prior_var_prob' must be a 1D numpy array.");
 					return NULL;
 				} else if (PyArray_SHAPE((PyArrayObject*)py_prior_var_prob)[0]!=n_model_var){
 					Py_XDECREF(py_model_var);
 					Py_XDECREF(py_prior_var_prob);
-					PyErr_SetString(PyExc_ValueError,"DecisionPolicy instance's attribute 'prior_var_prob' must have the same shape as attribute 'model_var'.");
+					PyErr_SetString(PyExc_ValueError,"DecisionModel instance's attribute 'prior_var_prob' must have the same shape as attribute 'model_var'.");
 					return NULL;
 				}
 				unknown_model_var_array = (double*)PyArray_DATA((PyArrayObject*)py_model_var);
@@ -113,7 +113,7 @@ DecisionPolicyDescriptor* get_descriptor(PyObject* py_dp){
 		py_cost==NULL ||
 		(prior_type==1 && (py_prior_mu_mean==NULL || py_prior_mu_var==NULL)) ||
 		(prior_type==2 && (py_mu_prior==NULL || py_weight_prior==NULL))){
-		PyErr_SetString(PyExc_ValueError, "Could not parse all decisionPolicy property values");
+		PyErr_SetString(PyExc_ValueError, "Could not parse all DecisionModel property values");
 		Py_XDECREF(py_prior_mu_mean);
 		Py_XDECREF(py_prior_mu_var);
 		Py_XDECREF(py_mu_prior);
@@ -221,24 +221,24 @@ DecisionPolicyDescriptor* get_descriptor(PyObject* py_dp){
 	Py_DECREF(py_tp);
 	Py_DECREF(py_cost);
 	
-	DecisionPolicyDescriptor* out;
+	DecisionModelDescriptor* out;
 	if (prior_type==1){
 		if (known_variance){
-			out = new DecisionPolicyDescriptor(known_model_var_value, prior_mu_mean, prior_mu_var,
+			out = new DecisionModelDescriptor(known_model_var_value, prior_mu_mean, prior_mu_var,
 							n, dt, T, reward, penalty, iti, tp, cost, owns_cost);
 		} else {
-			out = new DecisionPolicyDescriptor(n_model_var, unknown_model_var_array,
+			out = new DecisionModelDescriptor(n_model_var, unknown_model_var_array,
 							prior_var_prob, prior_mu_mean, prior_mu_var, n, dt, T, reward,
 							penalty, iti, tp, cost, owns_cost);
 		}
 	} else {
-		out = new DecisionPolicyDescriptor(known_model_var_value, n_prior, mu_prior, weight_prior,
+		out = new DecisionModelDescriptor(known_model_var_value, n_prior, mu_prior, weight_prior,
 						n, dt, T, reward, penalty, iti, tp, cost, owns_cost);
 	}
 	return out;
 }
 
-/* method xbounds(decisionPolicy, tolerance=1e-12, set_rho=True, set_bounds=True, return_values=False, root_bounds=None) */
+/* method xbounds(DecisionModel, tolerance=1e-12, set_rho=True, set_bounds=True, return_values=False, root_bounds=None) */
 static PyObject* dpmod_xbounds(PyObject* self, PyObject* args, PyObject* keywds){
 	double tolerance = 1e-12;
 	PyObject* py_dp;
@@ -261,8 +261,8 @@ static PyObject* dpmod_xbounds(PyObject* self, PyObject* args, PyObject* keywds)
 	PyObject* py_v_explore = NULL;
 	PyObject* py_v1 = NULL;
 	PyObject* py_v2 = NULL;
-	DecisionPolicy* dp;
-	DecisionPolicyDescriptor* dpd;
+	DecisionModel* dp;
+	DecisionModelDescriptor* dpd;
 	
 	
 	static char* kwlist[] = {"decPol", "tolerance","set_rho","set_bounds","return_values","root_bounds", NULL};
@@ -309,7 +309,7 @@ static PyObject* dpmod_xbounds(PyObject* self, PyObject* args, PyObject* keywds)
 	npy_intp py_nT[1] = {nT};
 	
 	if (!touch_py_bounds){
-		dp = DecisionPolicy::create(*dpd);
+		dp = DecisionModel::create(*dpd);
 	} else {
 		npy_intp bounds_shape[2] = {2,nT};
 		py_bounds = PyObject_GetAttrString(py_dp,"bounds");
@@ -317,17 +317,17 @@ static PyObject* dpmod_xbounds(PyObject* self, PyObject* args, PyObject* keywds)
 			PyErr_Clear(); // As we are handling the exception that py_dp has no attribute "bounds", we clear the exception state.
 			must_create_py_bounds = true;
 		} else if (!PyArray_Check((PyArrayObject*)py_bounds)){
-			// Attribute 'bounds' in DecisionPolicy instance is not a numpy array. We must re create py_bounds
+			// Attribute 'bounds' in DecisionModel instance is not a numpy array. We must re create py_bounds
 			Py_DECREF(py_bounds);
 			must_create_py_bounds = true;
 		} else if (PyArray_NDIM((PyArrayObject*)py_bounds)!=2){
-			// Attribute 'bounds' in DecisionPolicy instance does not have the correct shape. We must re create py_bounds
+			// Attribute 'bounds' in DecisionModel instance does not have the correct shape. We must re create py_bounds
 			Py_DECREF(py_bounds);
 			must_create_py_bounds = true;
 		} else {
 			for (int i=0;i<2;i++){
 				if (bounds_shape[i]!=PyArray_SHAPE((PyArrayObject*)py_bounds)[i]){
-					// Attribute 'bounds' in DecisionPolicy instance does not have the correct shape. We must re create py_bounds
+					// Attribute 'bounds' in DecisionModel instance does not have the correct shape. We must re create py_bounds
 					Py_DECREF(py_bounds);
 					must_create_py_bounds = true;
 					break;
@@ -337,7 +337,7 @@ static PyObject* dpmod_xbounds(PyObject* self, PyObject* args, PyObject* keywds)
 		if (must_create_py_bounds){
 			py_bounds = PyArray_SimpleNew(2,bounds_shape,NPY_DOUBLE);
 			if (py_bounds==NULL){
-				PyErr_SetString(PyExc_MemoryError,"An error occured attempting to create the numpy array that would stores the DecisionPolicy instance's bounds attribute. Out of memory.");
+				PyErr_SetString(PyExc_MemoryError,"An error occured attempting to create the numpy array that would stores the DecisionModel instance's bounds attribute. Out of memory.");
 				goto error_cleanup;
 			}
 			if (PyObject_SetAttrString(py_dp,"bounds", py_bounds)==-1){
@@ -346,7 +346,7 @@ static PyObject* dpmod_xbounds(PyObject* self, PyObject* args, PyObject* keywds)
 			}
 			must_dec_ref_py_bounds = 0;
 		}
-		dp = DecisionPolicy::create(*dpd,
+		dp = DecisionModel::create(*dpd,
 								(double*)PyArray_GETPTR2((PyArrayObject*)py_bounds,(npy_intp)0,(npy_intp)0),
 								(double*)PyArray_GETPTR2((PyArrayObject*)py_bounds,(npy_intp)1,(npy_intp)0),
 								((int) PyArray_STRIDE((PyArrayObject*)py_bounds,1))/sizeof(double)); // We divide by sizeof(double) because strides determines the number of bytes to stride in each dimension. As we cast the supplied void pointer to double*, each element has sizeof(double) bytes instead of 1 byte.
@@ -395,7 +395,7 @@ static PyObject* dpmod_xbounds(PyObject* self, PyObject* args, PyObject* keywds)
 	}
 	if (set_rho_in_py_dp){
 		if (PyObject_SetAttrString(py_dp,"rho",Py_BuildValue("d",dp->rho))==-1){
-			PyErr_SetString(PyExc_ValueError, "Could not set decisionPolicy property rho");
+			PyErr_SetString(PyExc_ValueError, "Could not set DecisionModel property rho");
 			delete(dp);
 			goto error_cleanup;
 		}
@@ -432,7 +432,7 @@ error_cleanup:
 	return NULL;
 }
 
-/* method xbounds_fixed_rho(decisionPolicy, rho=None, set_bounds=False, return_values=False) */
+/* method xbounds_fixed_rho(DecisionModel, rho=None, set_bounds=False, return_values=False) */
 static PyObject* dpmod_xbounds_fixed_rho(PyObject* self, PyObject* args, PyObject* keywds){
 	PyObject* py_dp;
 	PyObject* py_touch_py_bounds = Py_False;
@@ -451,8 +451,8 @@ static PyObject* dpmod_xbounds_fixed_rho(PyObject* self, PyObject* args, PyObjec
 	PyObject* py_v_explore = NULL;
 	PyObject* py_v1 = NULL;
 	PyObject* py_v2 = NULL;
-	DecisionPolicy* dp;
-	DecisionPolicyDescriptor* dpd;
+	DecisionModel* dp;
+	DecisionModelDescriptor* dpd;
 	
 	
 	static char* kwlist[] = {"decPol","rho","set_bounds","return_values", NULL};
@@ -462,7 +462,7 @@ static PyObject* dpmod_xbounds_fixed_rho(PyObject* self, PyObject* args, PyObjec
 	if (py_rho==Py_None) { // Use dp rho value
 		py_rho = PyObject_GetAttrString(py_dp,"rho");
 		if (py_rho==NULL){
-			PyErr_SetString(PyExc_ValueError, "DecisionPolicy instance has no rho attribute. You should set it or pass rho as the second parameter to the 'value' function");
+			PyErr_SetString(PyExc_ValueError, "DecisionModel instance has no rho attribute. You should set it or pass rho as the second parameter to the 'value' function");
 			return NULL;
 		}
 		rho = PyFloat_AsDouble(py_rho);
@@ -495,7 +495,7 @@ static PyObject* dpmod_xbounds_fixed_rho(PyObject* self, PyObject* args, PyObjec
 	npy_intp py_nT[1] = {nT};
 	
 	if (!touch_py_bounds){
-		dp = DecisionPolicy::create(*dpd);
+		dp = DecisionModel::create(*dpd);
 	} else {
 		npy_intp bounds_shape[2] = {2,nT};
 		py_bounds = PyObject_GetAttrString(py_dp,"bounds");
@@ -503,17 +503,17 @@ static PyObject* dpmod_xbounds_fixed_rho(PyObject* self, PyObject* args, PyObjec
 			PyErr_Clear(); // As we are handling the exception that py_dp has no attribute "bounds", we clear the exception state.
 			must_create_py_bounds = true;
 		} else if (!PyArray_Check((PyArrayObject*)py_bounds)){
-			// Attribute 'bounds' in DecisionPolicy instance is not a numpy array. We must re create py_bounds
+			// Attribute 'bounds' in DecisionModel instance is not a numpy array. We must re create py_bounds
 			Py_DECREF(py_bounds);
 			must_create_py_bounds = true;
 		} else if (PyArray_NDIM((PyArrayObject*)py_bounds)!=2){
-			// Attribute 'bounds' in DecisionPolicy instance does not have the correct shape. We must re create py_bounds
+			// Attribute 'bounds' in DecisionModel instance does not have the correct shape. We must re create py_bounds
 			Py_DECREF(py_bounds);
 			must_create_py_bounds = true;
 		} else {
 			for (int i=0;i<2;i++){
 				if (bounds_shape[i]!=PyArray_SHAPE((PyArrayObject*)py_bounds)[i]){
-					// Attribute 'bounds' in DecisionPolicy instance does not have the correct shape. We must re create py_bounds
+					// Attribute 'bounds' in DecisionModel instance does not have the correct shape. We must re create py_bounds
 					Py_DECREF(py_bounds);
 					must_create_py_bounds = true;
 					break;
@@ -523,7 +523,7 @@ static PyObject* dpmod_xbounds_fixed_rho(PyObject* self, PyObject* args, PyObjec
 		if (must_create_py_bounds){
 			py_bounds = PyArray_SimpleNew(2,bounds_shape,NPY_DOUBLE);
 			if (py_bounds==NULL){
-				PyErr_SetString(PyExc_MemoryError,"An error occured attempting to create the numpy array that would stores the DecisionPolicy instance's bounds attribute. Out of memory.");
+				PyErr_SetString(PyExc_MemoryError,"An error occured attempting to create the numpy array that would stores the DecisionModel instance's bounds attribute. Out of memory.");
 				goto error_cleanup;
 			}
 			if (PyObject_SetAttrString(py_dp,"bounds", py_bounds)==-1){
@@ -532,7 +532,7 @@ static PyObject* dpmod_xbounds_fixed_rho(PyObject* self, PyObject* args, PyObjec
 			}
 			must_dec_ref_py_bounds = 0;
 		}
-		dp = DecisionPolicy::create(*dpd,
+		dp = DecisionModel::create(*dpd,
 								(double*)PyArray_GETPTR2((PyArrayObject*)py_bounds,(npy_intp)0,(npy_intp)0),
 								(double*)PyArray_GETPTR2((PyArrayObject*)py_bounds,(npy_intp)1,(npy_intp)0),
 								((int) PyArray_STRIDE((PyArrayObject*)py_bounds,1))/sizeof(double)); // We divide by sizeof(double) because strides determines the number of bytes to stride in each dimension. As we cast the supplied void pointer to double*, each element has sizeof(double) bytes instead of 1 byte.
@@ -607,7 +607,7 @@ error_cleanup:
 	return NULL;
 }
 
-/* method values(decisionPolicy, rho=None) */
+/* method values(DecisionModel, rho=None) */
 static PyObject* dpmod_values(PyObject* self, PyObject* args, PyObject* keywds){
 	PyObject* py_dp;
 	PyObject* py_rho = Py_None;
@@ -617,8 +617,8 @@ static PyObject* dpmod_values(PyObject* self, PyObject* args, PyObject* keywds){
 	PyObject* py_v_explore = NULL;
 	PyObject* py_v1 = NULL;
 	PyObject* py_v2 = NULL;
-	DecisionPolicy* dp;
-	DecisionPolicyDescriptor* dpd;
+	DecisionModel* dp;
+	DecisionModelDescriptor* dpd;
 	
 	static char* kwlist[] = {"decPol", "rho", NULL};
 	if (!PyArg_ParseTupleAndKeywords(args, keywds, "O|O", kwlist, &py_dp, &py_rho))
@@ -627,7 +627,7 @@ static PyObject* dpmod_values(PyObject* self, PyObject* args, PyObject* keywds){
 	if (py_rho==Py_None) { // Use dp rho value
 		py_rho = PyObject_GetAttrString(py_dp,"rho");
 		if (py_rho==NULL){
-			PyErr_SetString(PyExc_ValueError, "DecisionPolicy instance has no rho attribute. You should set it or pass rho as the second parameter to the 'value' function");
+			PyErr_SetString(PyExc_ValueError, "DecisionModel instance has no rho attribute. You should set it or pass rho as the second parameter to the 'value' function");
 			return NULL;
 		}
 		rho = PyFloat_AsDouble(py_rho);
@@ -646,7 +646,7 @@ static PyObject* dpmod_values(PyObject* self, PyObject* args, PyObject* keywds){
 		// An error occurred while getting the descriptor and the error message was set within get_descriptor
 		return NULL;
 	}
-	dp = DecisionPolicy::create(*dpd);
+	dp = DecisionModel::create(*dpd);
 	dp->rho = rho;
 	
 	npy_intp py_value_shape[2] = {dp->nT,dp->n};
@@ -689,7 +689,7 @@ error_cleanup:
 	return NULL;
 }
 
-/* method rt(decisionPolicy, mu, bounds=None) */
+/* method rt(DecisionModel, mu, bounds=None) */
 static PyObject* dpmod_rt(PyObject* self, PyObject* args, PyObject* keywds){
 	PyObject* py_dp;
 	PyObject* py_bounds = Py_None;
@@ -702,8 +702,8 @@ static PyObject* dpmod_rt(PyObject* self, PyObject* args, PyObject* keywds){
 	PyObject* py_out = NULL;
 	PyObject* py_g1 = NULL;
 	PyObject* py_g2 = NULL;
-	DecisionPolicy* dp;
-	DecisionPolicyDescriptor* dpd;
+	DecisionModel* dp;
+	DecisionModelDescriptor* dpd;
 	
 	static char* kwlist[] = {"decPol", "mu", "model_var", "bounds", NULL};
 	if (!PyArg_ParseTupleAndKeywords(args, keywds, "Od|OO", kwlist, &py_dp, &mu, &py_model_var, &py_bounds))
@@ -719,7 +719,7 @@ static PyObject* dpmod_rt(PyObject* self, PyObject* args, PyObject* keywds){
 		if (dpd->known_variance()){
 			model_var = dpd->model_var[0];
 		} else {
-			PyErr_SetString(PyExc_ValueError, "When the DecisionPolicy instance has unknown variance (many discrete prior variances), this method's 'model_var' input becomes mandatory");
+			PyErr_SetString(PyExc_ValueError, "When the DecisionModel instance has unknown variance (many discrete prior variances), this method's 'model_var' input becomes mandatory");
 			goto early_error_cleanup;
 		}
 	} else {
@@ -728,7 +728,7 @@ static PyObject* dpmod_rt(PyObject* self, PyObject* args, PyObject* keywds){
 	
 	py_rho = PyObject_GetAttrString(py_dp,"rho");
 	if (py_rho==NULL){
-		PyErr_SetString(PyExc_ValueError, "decisionPolicy instance has no rho value set");
+		PyErr_SetString(PyExc_ValueError, "DecisionModel instance has no rho value set");
 		goto early_error_cleanup;
 	}
 	rho = PyFloat_AsDouble(py_rho);
@@ -738,7 +738,7 @@ static PyObject* dpmod_rt(PyObject* self, PyObject* args, PyObject* keywds){
 	}
 	Py_DECREF(py_rho);
 	
-	dp = DecisionPolicy::create(*dpd);
+	dp = DecisionModel::create(*dpd);
 	dp->rho = rho;
 	
 	if (py_bounds==Py_None) { // Compute xbounds if they are not provided
@@ -754,7 +754,7 @@ static PyObject* dpmod_rt(PyObject* self, PyObject* args, PyObject* keywds){
 	if (!PyArg_ParseTuple(py_bounds,"O!O!", &PyArray_Type, &py_xub, &PyArray_Type, &py_xlb))
 		goto error_cleanup;
 	if (PyArray_NDIM(py_xub)!=1 || PyArray_NDIM(py_xlb)!=1){
-		// Attribute 'bounds' in DecisionPolicy instance does not have the correct shape. We must re create py_bounds
+		// Attribute 'bounds' in DecisionModel instance does not have the correct shape. We must re create py_bounds
 		PyErr_SetString(PyExc_ValueError,"Supplied bounds must be numpy arrays with one dimension");
 		goto error_cleanup;
 	} else if (PyArray_SHAPE(py_xub)[0]!=py_nT[0] || PyArray_SHAPE(py_xlb)[0]!=py_nT[0]) {
@@ -804,7 +804,7 @@ early_error_cleanup:
 	return NULL;
 }
 
-/* method rt(decisionPolicy, mu, bounds=None) */
+/* method rt(DecisionModel, mu, bounds=None) */
 static PyObject* dpmod_fpt_conf_matrix(PyObject* self, PyObject* args, PyObject* keywds){
 	/***
 	* This method takes the confidence report as a function of time (CR)
@@ -884,20 +884,20 @@ static PyObject* dpmod_fpt_conf_matrix(PyObject* self, PyObject* args, PyObject*
 		out[i] = 0.;
 	}
 	
-	DecisionPolicyDescriptor* dpd = get_descriptor(py_dp);
+	DecisionModelDescriptor* dpd = get_descriptor(py_dp);
 	if (dpd==NULL){
 		// An error occurred while getting the descriptor and the error message was set within get_descriptor
 		Py_DECREF(py_out);
 		return NULL;
 	}
 	if (dpd->nT!=array_nT){
-		PyErr_Format(PyExc_ValueError, "first_passage_time and confidence_response have an inconsistent shape in axis=1. The shape should be equal to the decisionPolicy instance's nT = %d",dpd->nT);
+		PyErr_Format(PyExc_ValueError, "first_passage_time and confidence_response have an inconsistent shape in axis=1. The shape should be equal to the DecisionModel instance's nT = %d",dpd->nT);
 		delete dpd;
 		Py_DECREF(py_out);
 		return NULL;
 	}
 	
-	DecisionPolicy* dp = DecisionPolicy::create(*dpd);
+	DecisionModel* dp = DecisionModel::create(*dpd);
 	
 	dp->fpt_conf_matrix(first_passage_time, first_passage_time_strides, n_alternatives, confidence_partition, confidence_response, confidence_response_strides, out);
 	
@@ -1013,17 +1013,17 @@ static PyObject* dpmod_testsuite(PyObject* self, PyObject* args, PyObject* keywd
 	PyDict_SetItemString(dict3, "internal_var", PyFloat_FromDouble(internal_var));
 	PyDict_SetItemString(dict3, "cost", PyFloat_FromDouble(cost));
 	
-	// Create DecisionPolicyDescriptor
-	DecisionPolicyDescriptor* dpd1 = new DecisionPolicyDescriptor(model_var, prior_mu_mean, prior_mu_var,
+	// Create DecisionModelDescriptor
+	DecisionModelDescriptor* dpd1 = new DecisionModelDescriptor(model_var, prior_mu_mean, prior_mu_var,
 						n, dt, T, reward, penalty, iti, tp, cost_pointer, false);
-	DecisionPolicyDescriptor* dpd2 = new DecisionPolicyDescriptor(model_var, n_prior, mu_prior, weight_prior,
+	DecisionModelDescriptor* dpd2 = new DecisionModelDescriptor(model_var, n_prior, mu_prior, weight_prior,
 						n, dt, T, reward, penalty, iti, tp, cost_pointer, false);
-	DecisionPolicyDescriptor* dpd3 = new DecisionPolicyDescriptor(n_model_var, unknown_var, prior_var_prob,
+	DecisionModelDescriptor* dpd3 = new DecisionModelDescriptor(n_model_var, unknown_var, prior_var_prob,
 						prior_mu_mean, prior_mu_var,n, dt, T, reward, penalty, iti, tp, cost_pointer, false);
-	// Create DecisionPolicy
-	DecisionPolicy* dp1 = DecisionPolicy::create(*dpd1);
-	DecisionPolicy* dp2 = DecisionPolicy::create(*dpd2);
-	DecisionPolicy* dp3 = DecisionPolicy::create(*dpd3);
+	// Create DecisionModel
+	DecisionModel* dp1 = DecisionModel::create(*dpd1);
+	DecisionModel* dp2 = DecisionModel::create(*dpd2);
+	DecisionModel* dp3 = DecisionModel::create(*dpd3);
 	
 	// Create output arrays
 	double t = 0.;
@@ -1073,13 +1073,13 @@ static PyObject* dpmod_testsuite(PyObject* self, PyObject* args, PyObject* keywd
 
 static PyMethodDef DPMethods[] = {
     {"xbounds", (PyCFunction) dpmod_xbounds, METH_VARARGS | METH_KEYWORDS,
-     "Computes the decision bounds in x(t) space (i.e. the accumulated sensory input space)\n\n  (xub, xlb) = xbounds(dp, tolerance=1e-12, set_rho=False, set_bounds=False, return_values=False, root_bounds=None)\n\n(xub, xlb, value, v_explore, v1, v2) = xbounds(dp, ..., return_values=True)\n\nComputes the decision bounds for a decisionPolicy instance specified in 'dp'.\nThis function is more memory and computationally efficient than calling dp.invert_belief();dp.value_dp(); xb = dp.belief_bound_to_x_bound(b); from python. Another difference is that this function returns a tuple of (upper_bound, lower_bound) instead of a numpy array whose first element is upper_bound and second element is lower_bound.\n'tolerance' is a float that indicates the tolerance when searching for the rho value that yields value[int(n/2)]=0.\n'set_rho' must be an expression whose 'truthness' can be evaluated. If set_rho is True, the rho attribute in the python dp object will be set to the rho value obtained after iteration. If false, it will not be set.\n'set_bounds' must be an expression whose 'truthness' can be evaluated. If set_bounds is True, the python DecisionPolicy object's ´bounds´ attribute will be set to the upper and lower bounds in g space computed in the c++ instance. If false, it will do nothing.\nIf 'return_values' evaluates to True, then the function returns four extra numpy arrays: value, v_explore, v1 and v2. 'value' is an nT by n shaped array that holds the value of a given g at time t. 'v_explore' has shape nT-1 by n and holds the value of exploring at time t with a given g. v1 and v2 are values of immediately deciding for option 1 or 2, and are one dimensional arrays with n elements.\n'root_bounds' must be a tuple of two elements: (lower_bound, upper_bound). Both 'lower_bound' and 'upper_bound' must be floats that represent the lower and upper bounds in which to perform the root finding of rho.\n\n"},
+     "Computes the decision bounds in x(t) space (i.e. the accumulated sensory input space)\n\n  (xub, xlb) = xbounds(dp, tolerance=1e-12, set_rho=False, set_bounds=False, return_values=False, root_bounds=None)\n\n(xub, xlb, value, v_explore, v1, v2) = xbounds(dp, ..., return_values=True)\n\nComputes the decision bounds for a DecisionModel instance specified in 'dp'.\nThis function is more memory and computationally efficient than calling dp.invert_belief();dp.value_dp(); xb = dp.belief_bound_to_x_bound(b); from python. Another difference is that this function returns a tuple of (upper_bound, lower_bound) instead of a numpy array whose first element is upper_bound and second element is lower_bound.\n'tolerance' is a float that indicates the tolerance when searching for the rho value that yields value[int(n/2)]=0.\n'set_rho' must be an expression whose 'truthness' can be evaluated. If set_rho is True, the rho attribute in the python dp object will be set to the rho value obtained after iteration. If false, it will not be set.\n'set_bounds' must be an expression whose 'truthness' can be evaluated. If set_bounds is True, the python DecisionModel object's ´bounds´ attribute will be set to the upper and lower bounds in g space computed in the c++ instance. If false, it will do nothing.\nIf 'return_values' evaluates to True, then the function returns four extra numpy arrays: value, v_explore, v1 and v2. 'value' is an nT by n shaped array that holds the value of a given g at time t. 'v_explore' has shape nT-1 by n and holds the value of exploring at time t with a given g. v1 and v2 are values of immediately deciding for option 1 or 2, and are one dimensional arrays with n elements.\n'root_bounds' must be a tuple of two elements: (lower_bound, upper_bound). Both 'lower_bound' and 'upper_bound' must be floats that represent the lower and upper bounds in which to perform the root finding of rho.\n\n"},
     {"xbounds_fixed_rho", (PyCFunction) dpmod_xbounds_fixed_rho, METH_VARARGS | METH_KEYWORDS,
-     "Computes the decision bounds in x(t) space (i.e. the accumulated sensory input space) without iterating the value of rho\n\n  (xub, xlb) = xbounds_fixed_rho(dp, rho=None, set_bounds=False, return_values=False)\n\n(xub, xlb, value, v_explore, v1, v2) = xbounds_fixed_rho(dp, ..., return_values=True)\n\nComputes the decision bounds for a decisionPolicy instance specified in 'dp' for a given rho value.\nThis function is more memory and computationally efficient than calling dp.invert_belief();dp.value_dp(); xb = dp.belief_bound_to_x_bound(b); from python. Another difference is that this function returns a tuple of (upper_bound, lower_bound) instead of a numpy array whose first element is upper_bound and second element is lower_bound.\n'rho' is the fixed reward rate value used to compute the decision bounds and values. If rho=None, then the DecisionPolicy instance's rho is used.\n'set_bounds' must be an expression whose 'truthness' can be evaluated. If set_bounds is True, the python DecisionPolicy object's ´bounds´ attribute will be set to the upper and lower bounds in g space computed in the c++ instance. If false, it will do nothing.\nIf 'return_values' evaluates to True, then the function returns four extra numpy arrays: value, v_explore, v1 and v2. 'value' is an nT by n shaped array that holds the value of a given g at time t. 'v_explore' has shape nT-1 by n and holds the value of exploring at time t with a given g. v1 and v2 are values of immediately deciding for option 1 or 2, and are one dimensional arrays with n elements.\n\n"},
+     "Computes the decision bounds in x(t) space (i.e. the accumulated sensory input space) without iterating the value of rho\n\n  (xub, xlb) = xbounds_fixed_rho(dp, rho=None, set_bounds=False, return_values=False)\n\n(xub, xlb, value, v_explore, v1, v2) = xbounds_fixed_rho(dp, ..., return_values=True)\n\nComputes the decision bounds for a DecisionModel instance specified in 'dp' for a given rho value.\nThis function is more memory and computationally efficient than calling dp.invert_belief();dp.value_dp(); xb = dp.belief_bound_to_x_bound(b); from python. Another difference is that this function returns a tuple of (upper_bound, lower_bound) instead of a numpy array whose first element is upper_bound and second element is lower_bound.\n'rho' is the fixed reward rate value used to compute the decision bounds and values. If rho=None, then the DecisionModel instance's rho is used.\n'set_bounds' must be an expression whose 'truthness' can be evaluated. If set_bounds is True, the python DecisionModel object's ´bounds´ attribute will be set to the upper and lower bounds in g space computed in the c++ instance. If false, it will do nothing.\nIf 'return_values' evaluates to True, then the function returns four extra numpy arrays: value, v_explore, v1 and v2. 'value' is an nT by n shaped array that holds the value of a given g at time t. 'v_explore' has shape nT-1 by n and holds the value of exploring at time t with a given g. v1 and v2 are values of immediately deciding for option 1 or 2, and are one dimensional arrays with n elements.\n\n"},
     {"values", (PyCFunction) dpmod_values, METH_VARARGS | METH_KEYWORDS,
-     "Computes the values for a given reward rate, rho, and decisionPolicy parameters.\n\n(value, v_explore, v1, v2) = values(dp,rho=None)\n\nComputes the value for a given belief g as a function of time for a supplied reward rate, rho. If rho is set to None, then the decisionPolicy instance's rho attribute will be used.\nThis function is more memory and computationally efficient than calling dp.invert_belief();dp.value_dp(); from python. The function returns a tuple of four numpy arrays: value, v_explore, v1 and v2. 'value' is an nT by n shaped array that holds the value of a given g at time t. 'v_explore' has shape nT-1 by n and holds the value of exploring at time t with a given g. v1 and v2 are values of immediately deciding for option 1 or 2, and are one dimensional arrays with n elements.\n"},
+     "Computes the values for a given reward rate, rho, and DecisionModel parameters.\n\n(value, v_explore, v1, v2) = values(dp,rho=None)\n\nComputes the value for a given belief g as a function of time for a supplied reward rate, rho. If rho is set to None, then the DecisionModel instance's rho attribute will be used.\nThis function is more memory and computationally efficient than calling dp.invert_belief();dp.value_dp(); from python. The function returns a tuple of four numpy arrays: value, v_explore, v1 and v2. 'value' is an nT by n shaped array that holds the value of a given g at time t. 'v_explore' has shape nT-1 by n and holds the value of exploring at time t with a given g. v1 and v2 are values of immediately deciding for option 1 or 2, and are one dimensional arrays with n elements.\n"},
     {"rt", (PyCFunction) dpmod_rt, METH_VARARGS | METH_KEYWORDS,
-     "Computes the rt distribution for a given drift rate, mu, variance rate, DecisionPolicy parameters and decision bounds in x space, bounds.\n\n(g1, g2) = values(dp,mu,model_var=None,bounds=None)\n\nInput:\n  dp:        DecisionPolicy instace\n  mu:        Float that encodes the diffusion drift rate (net evidence).\n  bounds:    By default None. If None, the method internally calls the function xbounds(dp) with default parameter values to compute the decision bounds in x space. To avoid this, supply a tuple (xub,xlb) as the one that is returned by the function xbounds. xub and xlb must be one dimensional numpy arrays with the same elements as dp.t.\n  model_var: An input that is mandatory for DecisionPolicy instances with unknown variance that represents the variance rate of the diffusion process. If the DecisionPolicy instance has known variance and model_var is None, the instance's model_var is used as the diffusion's variance rate.\n\nOutput:\n  (g1,g2):   Each of these outputs are 1D numpy arrays with dp.nT number of elements representing the first passage time probability density for option 1 and 2 respectively.\n\n"},
+     "Computes the rt distribution for a given drift rate, mu, variance rate, DecisionModel parameters and decision bounds in x space, bounds.\n\n(g1, g2) = values(dp,mu,model_var=None,bounds=None)\n\nInput:\n  dp:        DecisionModel instace\n  mu:        Float that encodes the diffusion drift rate (net evidence).\n  bounds:    By default None. If None, the method internally calls the function xbounds(dp) with default parameter values to compute the decision bounds in x space. To avoid this, supply a tuple (xub,xlb) as the one that is returned by the function xbounds. xub and xlb must be one dimensional numpy arrays with the same elements as dp.t.\n  model_var: An input that is mandatory for DecisionModel instances with unknown variance that represents the variance rate of the diffusion process. If the DecisionModel instance has known variance and model_var is None, the instance's model_var is used as the diffusion's variance rate.\n\nOutput:\n  (g1,g2):   Each of these outputs are 1D numpy arrays with dp.nT number of elements representing the first passage time probability density for option 1 and 2 respectively.\n\n"},
     {"fpt_conf_matrix", (PyCFunction) dpmod_fpt_conf_matrix, METH_VARARGS | METH_KEYWORDS,
      "This method takes the confidence report as a function of time (CR)\nand converts it to a matrix. This matrix is filled with zeroes\nexcept for the entries that are touched by the plot of CR. The\nvalue of each entry is given by the first passage time probability\ndensity (FPT).\n\n\nfpt_conf_matrix(self,first_passage_time, confidence_response, confidence_partition=100)\n\nInput:\n	first_passage_time: A 2D numpy array of doubles with the FPT.\n		Axis=0 represents different responses and axis=1 time. The\n		shape of axis=1 must be equal to self.nT.\n	confidence_response: A 2D numpy array of doubles with the CR.\n		It must have the same shape as the first_passage_time input.\n	confidence_partition: An int that determines the number of\n		discrete confidence report values, uniformly distributed in\n		the interval [0,1], that will be used to construct the\n		output array.\n\nOutput: A 3D numpy array of shape:\n	(first_passage_time.shape[0],confidence_partition,first_passage_time.shape[1])\n	The values are such that np.sum(output,axis=1)==first_passage_time\n	and calling imshow(output[0]>0,origin='lower') and\n	plot(confidence_partition) will show almost overlapping curves.\n\n"},
     {"testsuite", (PyCFunction) dpmod_testsuite, METH_VARARGS,""},

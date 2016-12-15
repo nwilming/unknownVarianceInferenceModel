@@ -16,7 +16,7 @@ from __future__ import division, print_function, absolute_import, unicode_litera
 import enum, os, sys, math, scipy, pickle, warnings, json, logging, logging.config, copy, re
 import scipy.signal
 import numpy as np
-from utils import normpdf,average_downsample,parse_options_file
+from utils import normpdf,average_downsample,parse_details_file
 
 try:
 	with warnings.catch_warnings():
@@ -29,14 +29,13 @@ try:
 	can_plot = True
 except:
 	can_plot = False
-import data_io_cognition as io
-from cost_time import DecisionPolicy
+import data_io as io
+from decision_model import DecisionModel
 import cma
 
-package_logger = logging.getLogger("fits_cognition")
+package_logger = logging.getLogger("fits_module")
 
-options = parse_options_file()
-raw_data_dir = options['raw_data_dir']
+options = parse_details_file()
 experiment_details = options['experiment_details']
 del options
 
@@ -212,12 +211,12 @@ class Fitter:
 	#~ __module__ = os.path.splitext(os.path.basename(__file__))[0]
 	# Initer
 	def __init__(self,subjectSession,method='full_confidence',optimizer='cma',\
-				decisionPolicyKwArgs={},suffix='',rt_cutoff=None,confidence_partition=100,\
+				decisionModelKwArgs={},suffix='',rt_cutoff=None,confidence_partition=100,\
 				confidence_mapping_method='log_odds',binary_split_method='median',
 				fits_path='fits_cognition'):
 		"""
 		Fitter(subjectSession,method='full_confidence',optimizer='cma',\
-				decisionPolicyKwArgs={},suffix='',rt_cutoff=None,confidence_partition=100,\
+				decisionModelKwArgs={},suffix='',rt_cutoff=None,confidence_partition=100,\
 				confidence_mapping_method='log_odds',binary_split_method='median',
 				fits_path='fits_cognition')
 		
@@ -238,8 +237,8 @@ class Fitter:
 				Available optimizers are 'cma', scipy.optimize.basinhopping
 				and scipy.optimize methods called from minimize and
 				minimize_scalar.
-			decisionPolicyKwArgs: A dict of kwargs to use for the construction
-				of the used DecisionPolicy instance
+			decisionModelKwArgs: A dict of kwargs to use for the construction
+				of the used DecisionModel instance
 			suffix: A string suffix to append to the saved filenames
 			rt_cutoff: None or a float. If not None, it is used to
 				override the experiment default rt_cutoff specified in
@@ -250,7 +249,7 @@ class Fitter:
 				high confidence mapping method. Available values are
 				'log_odds' and 'belief'. If 'log_odds' the confidence
 				mapping is the composition of the log odds of the decision
-				bounds in g space (see cost_time DecisionPolicy decision
+				bounds in g space (see cost_time DecisionModel decision
 				bounds) with a sigmoid. If 'belief', the confidence mapping
 				is a linear mapping of the rescaled decision bounds in g
 				space (the rescaling makes high confidence values (1 for
@@ -278,13 +277,11 @@ class Fitter:
 		"""
 		package_logger.debug('Creating Fitter instance for "{experiment}" experiment and "{name}" subject with sessions={session}'.format(
 						experiment=subjectSession.experiment,name=subjectSession.name,session=subjectSession.session))
-		self.logger = logging.getLogger("fits_cognition.Fitter")
-		self.decisionPolicyKwArgs = decisionPolicyKwArgs.copy()
-		self.logger.debug('Setted decisionPolicyKwArgs = {0}'.format(self.decisionPolicyKwArgs))
+		self.logger = logging.getLogger("fits_module.Fitter")
+		self.decisionModelKwArgs = decisionModelKwArgs.copy()
+		self.logger.debug('Setted decisionModelKwArgs = {0}'.format(self.decisionModelKwArgs))
 		self.fits_path = fits_path
 		self.logger.debug('Setted fits_path = %s',self.fits_path)
-		self.raw_data_dir = raw_data_dir
-		self.logger.debug('Setted raw_data_dir = %s',self.raw_data_dir)
 		self.set_experiment(subjectSession.experiment)
 		if not rt_cutoff is None:
 			self.rt_cutoff = float(rt_cutoff)
@@ -312,7 +309,6 @@ class Fitter:
 		string = """
 <{class_module}.{class_name} object at {address}>
 fits_path = {fits_path},
-raw_data_dir = {raw_data_dir},
 experiment = {experiment},
 method = {method},
 optimizer = {optimizer},
@@ -320,7 +316,7 @@ confidence_mapping_method = {confidence_mapping_method},
 suffix = {suffix},
 binary_split_method = {binary_split_method},
 rt_cutoff = {rt_cutoff},
-decisionPolicyKwArgs = {decisionPolicyKwArgs},
+decisionModelKwArgs = {decisionModelKwArgs},
 confidence_partition = {confidence_partition},
 _fit_arguments = {_fit_arguments},
 _fit_output = {_fit_output}
@@ -328,7 +324,6 @@ _fit_output = {_fit_output}
 					class_name=self.__class__.__name__,
 					address=hex(id(self)),
 					fits_path=self.fits_path,
-					raw_data_dir=self.raw_data_dir,
 					experiment = self.experiment,
 					method = self.method,
 					optimizer = self.optimizer,
@@ -336,7 +331,7 @@ _fit_output = {_fit_output}
 					suffix = self.suffix,
 					binary_split_method = self.binary_split_method,
 					rt_cutoff = self.rt_cutoff,
-					decisionPolicyKwArgs = self.decisionPolicyKwArgs,
+					decisionModelKwArgs = self.decisionModelKwArgs,
 					confidence_partition = self.confidence_partition,
 					_fit_arguments = self._fit_arguments,
 					_fit_output = self._fit_output)
@@ -351,10 +346,10 @@ _fit_output = {_fit_output}
 		"""
 		self.experiment = str(experiment)
 		try:
-			decisionPolicyKwArgs = experiment_details[self.experiment]['DecisionPolicy'].copy()
-			decisionPolicyKwArgs.update(self.decisionPolicyKwArgs)
-			self.logger.debug('Will construct DecisionPolicy instance with the folling kwargs:\n{0}'.format(decisionPolicyKwArgs))
-			self.dp = DecisionPolicy(**decisionPolicyKwArgs)
+			decisionModelKwArgs = experiment_details[self.experiment]['DecisionModel'].copy()
+			decisionModelKwArgs.update(self.decisionModelKwArgs)
+			self.logger.debug('Will construct DecisionModel instance with the folling kwargs:\n{0}'.format(decisionModelKwArgs))
+			self.dp = DecisionModel(**decisionModelKwArgs)
 			if 'time_available_to_respond' in experiment_details[self.experiment]['Fitter']:
 				self._time_available_to_respond = experiment_details[self.experiment]['Fitter']['time_available_to_respond']
 			else:
@@ -405,9 +400,9 @@ _fit_output = {_fit_output}
 		self._subjectSession_state = subjectSession.__getstate__()
 		self.logger.debug('Setted Fitter _subjectSession_state')
 		self.logger.debug('experiment:%(experiment)s, name:%(name)s, session:%(session)s, data_dir:%(data_dir)s',self._subjectSession_state)
-		dat = subjectSession.load_data(override_raw_data_dir={'original':self.raw_data_dir,'replacement':raw_data_dir})
+		dat = subjectSession.load_data()
 		self.logger.debug('Loading subjectSession data')
-		self.rt = dat[:,1]
+		self.rt = dat['rt']
 		self.rt+=self._forced_non_decision_time
 		valid_trials = self.rt<=self.rt_cutoff
 		self.rt = self.rt[valid_trials]
@@ -419,9 +414,9 @@ _fit_output = {_fit_output}
 		if trials==0:
 			raise RuntimeError('No trials can be fitted')
 		
-		self.contrast = (dat[:,0]-self._distractor)/self._ISI
-		self.performance = dat[:,2]
-		self.confidence = dat[:,3]
+		self.contrast = (dat['contrast']-self._distractor)/self._ISI
+		self.performance = dat['performance']
+		self.confidence = dat['confidence']
 		if not self.dp.known_variance():
 			self.external_var = dat[:,self.subjectSession.column_description().index('external_var')]
 			self.unique_stim,self.stim_indeces,counts = utils.unique_rows(np.array([self.contrast,self.external_var]).T,return_inverse=True,return_counts=True)
@@ -450,11 +445,10 @@ _fit_output = {_fit_output}
 		another one.
 		
 		"""
-		self.logger = logging.getLogger("fits_cognition.Fitter")
-		self.decisionPolicyKwArgs = state['decisionPolicyKwArgs']
+		self.logger = logging.getLogger("fits_module.Fitter")
+		self.decisionModelKwArgs = state['decisionModelKwArgs']
 		self.set_experiment(state['experiment'])
 		self.rt_cutoff = float(state['rt_cutoff'])
-		self.raw_data_dir = state['raw_data_dir']
 		if 'fits_path' in state.keys():
 			self.fits_path = state['fits_path']
 		else:
@@ -742,9 +736,8 @@ _fit_output = {_fit_output}
 				 'method':self.method,
 				 'optimizer':self.optimizer,
 				 'suffix':self.suffix,
-				 'decisionPolicyKwArgs':self.decisionPolicyKwArgs,
+				 'decisionModelKwArgs':self.decisionModelKwArgs,
 				 'confidence_partition':self.confidence_partition,
-				 'raw_data_dir':self.raw_data_dir,
 				 'confidence_mapping_method':self.confidence_mapping_method,
 				 'binary_split_method':self.binary_split_method,
 				 'fits_path':self.fits_path}
@@ -936,7 +929,7 @@ _fit_output = {_fit_output}
 		names and the values are the parameter displacements that should
 		be used to compute the numerical jacobian.
 		Regretably, we cannot compute an analytical form of the derivative
-		of the first passage time probability density in cost_time.DecisionPolicy.rt
+		of the first passage time probability density in decision_model.DecisionModel.rt
 		and this forces us to use a numerical approximation of the
 		jacobian. The values returned by this function are only used
 		with the scipy's optimize methods: CG, BFGS, Newton-CG, L-BFGS-B,
@@ -2517,7 +2510,7 @@ class Fitter_plot_handler():
 		attribute value will be ignored.
 		
 		"""
-		self.logger = logging.getLogger("fits_cognition.Fitter_plot_handler")
+		self.logger = logging.getLogger("fits_module.Fitter_plot_handler")
 		self.binary_split_method = binary_split_method
 		self.required_data = ['hit_histogram','miss_histogram','rt','confidence','t_array','c_array']
 		# For backward compatibility
@@ -2945,7 +2938,7 @@ class Fitter_plot_handler():
 		f.close()
 	
 	def __setstate__(self,state):
-		self.logger = logging.getLogger("fits_cognition.Fitter_plot_handler")
+		self.logger = logging.getLogger("fits_module.Fitter_plot_handler")
 		if 'binary_split_method' in state.keys():
 			binary_split_method = state['binary_split_method']
 		else:
@@ -2984,9 +2977,9 @@ class Fitter_plot_handler():
 def parse_input():
 	script_help = """ moving_bounds_fits.py help
  Sintax:
- moving_bounds_fits.py [option flag] [option value]
+ fits_module.py [option flag] [option value]
  
- moving_bounds_fits.py -h [or --help] displays help
+ fits_module.py -h [or --help] displays help
  
  Optional arguments are:
  '-t' or '--task': Integer that identifies the task number when running multiple tasks
@@ -3147,8 +3140,8 @@ def parse_input():
                "phase_out_prob":[0.,1.],"internal_var":[self._internal_var*1e-6,self._internal_var*1e3],
                "high_confidence_threshold":[0.,3.],"confidence_map_slope":[0.,1e12]}'
  
- '--dpKwargs': A dictionary of optional keyword args used to construct a DecisionPolicy instance.
-               Refer to DecisionPolicy in cost_time.py for posible key-value pairs. [Default '{}']
+ '--dmKwargs': A dictionary of optional keyword args used to construct a DecisionModel instance.
+               Refer to DecisionModel in decision_model.py for posible key-value pairs. [Default '{}']
  
  '--optimizer_kwargs': A dictionary of options passed to the optimizer with a few additions.
                        If the optimizer is cma, refer to fmin in cma.py for the list of
@@ -3200,7 +3193,7 @@ def parse_input():
  python moving_bounds_fits.py -t 1 -n 1 --save"""
 	options =  {'task':1,'ntasks':1,'task_base':1,'method':'full','optimizer':'cma','save':False,
 				'show':False,'fit':True,'suffix':'','rt_cutoff':None,
-				'merge':None,'fixed_parameters':{},'dpKwargs':{},'start_point':{},'bounds':{},
+				'merge':None,'fixed_parameters':{},'dmKwargs':{},'start_point':{},'bounds':{},
 				'optimizer_kwargs':{},'experiment':'all','debug':False,'confidence_partition':100,
 				'plot_merge':None,'verbose':False,'save_plot_handler':False,'load_plot_handler':False,
 				'start_point_from_fit_output':None,'override':False,'plot_handler_rt_cutoff':None,
@@ -3211,11 +3204,11 @@ def parse_input():
 		logging.basicConfig(level=logging.DEBUG)
 	elif '-v' in sys.argv or '--verbose' in sys.argv:
 		options['verbose'] = True
-		logging.basicConfig(level=logging.INFO)
 		logging.disable(logging.DEBUG)
+		logging.basicConfig(level=logging.INFO)
 	else:
-		logging.basicConfig(level=logging.WARNING)
 		logging.disable(logging.INFO)
+		logging.basicConfig(level=logging.WARNING)
 	expecting_key = True
 	json_encoded_key = False
 	key = None
@@ -3287,8 +3280,8 @@ def parse_input():
 				key = 'bounds'
 				expecting_key = False
 				json_encoded_key = True
-			elif arg=='--dpKwargs':
-				key = 'dpKwargs'
+			elif arg=='--dmKwargs':
+				key = 'dmKwargs'
 				expecting_key = False
 				json_encoded_key = True
 			elif arg=='--optimizer_kwargs':
@@ -3313,7 +3306,7 @@ def parse_input():
 				expecting_key = False
 			elif arg=='-h' or arg=='--help':
 				print(script_help)
-				sys.exit()
+				sys.exit(2)
 			else:
 				raise RuntimeError("Unknown option: {opt} encountered in position {pos}. Refer to the help to see the list of options".format(opt=arg,pos=i+1))
 		else:
@@ -3524,7 +3517,7 @@ if __name__=="__main__":
 	ntasks = options['ntasks']
 	
 	# Prepare subjectSessions list
-	subjects = io.filter_subjects_list(io.unique_subject_sessions(raw_data_dir),'all_sessions_by_experiment')
+	subjects = io.filter_subjects_list(io.unique_subject_sessions(),'all_sessions_by_experiment')
 	if options['experiment']!='all':
 		subjects = io.filter_subjects_list(subjects,'experiment_'+options['experiment'])
 	package_logger.debug('Total number of subjectSessions listed = {0}'.format(len(subjects)))
@@ -3540,7 +3533,7 @@ if __name__=="__main__":
 			if options['fit']:
 				package_logger.debug('Flag "fit" was True')
 				fitter = Fitter(s,method=options['method'],
-					   optimizer=options['optimizer'],decisionPolicyKwArgs=options['dpKwargs'],
+					   optimizer=options['optimizer'],decisionModelKwArgs=options['dmKwargs'],
 					   suffix=options['suffix'],rt_cutoff=options['rt_cutoff'],
 					   confidence_partition=options['confidence_partition'],
 					   confidence_mapping_method=options['confidence_mapping_method'],
@@ -3662,12 +3655,12 @@ if __name__=="__main__":
 	# Prepare figure saver
 	if options['save']:
 		if task==0 and ntasks==1:
-			fname = "fits_cognition_{experiment}{method}_{cmapmeth}{suffix}".format(\
+			fname = "fits_{experiment}{method}_{cmapmeth}{suffix}".format(\
 					experiment=options['experiment']+'_' if options['experiment']!='all' else '',\
 					method=options['method'],suffix=options['suffix'],
 					cmapmeth=options['confidence_mapping_method'])
 		else:
-			fname = "fits_cognition_{experiment}{method}_{cmapmeth}_{task}_{ntasks}{suffix}".format(\
+			fname = "fits_{experiment}{method}_{cmapmeth}_{task}_{ntasks}{suffix}".format(\
 					experiment=options['experiment']+'_' if options['experiment']!='all' else '',\
 					method=options['method'],task=task,ntasks=ntasks,suffix=options['suffix'],\
 					cmapmeth=options['confidence_mapping_method'])

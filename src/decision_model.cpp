@@ -1,4 +1,4 @@
-#include "DecisionPolicy.hpp"
+#include "DecisionModel.hpp"
 /***
 C++ implementation of the value dynamic programming algorithm and
 first passage time probability density computations
@@ -7,7 +7,7 @@ Author: Luciano Paz
 Year: 2016
 ***/
 
-DecisionPolicyDescriptor::DecisionPolicyDescriptor(double model_var, double prior_mu_mean, double prior_mu_var,
+DecisionModelDescriptor::DecisionModelDescriptor(double model_var, double prior_mu_mean, double prior_mu_var,
 				   int n, double dt, double T, double reward, double penalty,
 				   double iti, double tp, double* cost, bool owns_cost){
 	this->_known_variance = true;
@@ -35,7 +35,7 @@ DecisionPolicyDescriptor::DecisionPolicyDescriptor(double model_var, double prio
 	this->weight_prior = (double*)0;
 }
 
-DecisionPolicyDescriptor::DecisionPolicyDescriptor(double model_var, int n_prior, double* mu_prior, double* weight_prior,
+DecisionModelDescriptor::DecisionModelDescriptor(double model_var, int n_prior, double* mu_prior, double* weight_prior,
 				   int n, double dt, double T, double reward, double penalty,
 				   double iti, double tp, double* cost, bool owns_cost){
 	this->_known_variance = true;
@@ -64,7 +64,7 @@ DecisionPolicyDescriptor::DecisionPolicyDescriptor(double model_var, int n_prior
 		this->weight_prior[i] = weight_prior[i];
 	}
 }
-DecisionPolicyDescriptor::DecisionPolicyDescriptor(int n_model_var, double* model_var,
+DecisionModelDescriptor::DecisionModelDescriptor(int n_model_var, double* model_var,
 				   double* prior_var_prob, double prior_mu_mean, double prior_mu_var,
 				   int n, double dt, double T, double reward, double penalty,
 				   double iti, double tp, double* cost, bool owns_cost){
@@ -97,7 +97,7 @@ DecisionPolicyDescriptor::DecisionPolicyDescriptor(int n_model_var, double* mode
 	this->weight_prior = (double*)0;
 }
 
-DecisionPolicyDescriptor::~DecisionPolicyDescriptor(){
+DecisionModelDescriptor::~DecisionModelDescriptor(){
 	delete[] this->model_var;
 	if (!(_known_variance)){
 		delete[] this->prior_var_prob;
@@ -111,12 +111,12 @@ DecisionPolicyDescriptor::~DecisionPolicyDescriptor(){
 	}
 }
 
-void DecisionPolicyDescriptor::disp(){
+void DecisionModelDescriptor::disp(){
 	/***
-	 * Print DecisionPolicyDescriptor instance's information
+	 * Print DecisionModelDescriptor instance's information
 	***/
 	int i;
-	std::cout<<"DecisionPolicyDescriptor instance = "<<this<<std::endl;
+	std::cout<<"DecisionModelDescriptor instance = "<<this<<std::endl;
 	std::cout<<"owns_cost = "<<_owns_cost<<std::endl;
 	std::cout<<"known_variance = "<<_known_variance<<std::endl;
 	std::cout<<"conjugate_mu_prior = "<<_conjugate_mu_prior<<std::endl;
@@ -169,7 +169,7 @@ void DecisionPolicyDescriptor::disp(){
 	}
 }
 
-DecisionPolicy::DecisionPolicy(bool known_variance, bool conjugate_mu_prior,
+DecisionModel::DecisionModel(bool known_variance, bool conjugate_mu_prior,
 				   double prior_mu_mean, double prior_mu_var,
 				   int n, double dt, double T, double reward, double penalty,
 				   double iti, double tp, double* cost){
@@ -212,7 +212,7 @@ DecisionPolicy::DecisionPolicy(bool known_variance, bool conjugate_mu_prior,
 	this->bound_strides = 1;
 }
 
-DecisionPolicy::DecisionPolicy(bool known_variance, bool conjugate_mu_prior,
+DecisionModel::DecisionModel(bool known_variance, bool conjugate_mu_prior,
 				   double prior_mu_mean, double prior_mu_var,
 				   int n, double dt, double T, double reward, double penalty,
 				   double iti, double tp, double* cost, double* ub, double* lb,int bound_strides){
@@ -255,7 +255,7 @@ DecisionPolicy::DecisionPolicy(bool known_variance, bool conjugate_mu_prior,
 	this->bound_strides = bound_strides;
 }
 
-DecisionPolicy::~DecisionPolicy(){
+DecisionModel::~DecisionModel(){
 	/***
 	 * Destructor
 	***/
@@ -266,15 +266,15 @@ DecisionPolicy::~DecisionPolicy(){
 		delete[] lb;
 	}
 	#ifdef DEBUG
-	std::cout<<"Destroyed DecisionPolicy instance"<<std::endl;
+	std::cout<<"Destroyed DecisionModel instance"<<std::endl;
 	#endif
 }
 
-void DecisionPolicy::disp(){
+void DecisionModel::disp(){
 	/***
-	 * Print DecisionPolicy instance's information
+	 * Print DecisionModel instance's information
 	***/
-	std::cout<<"DecisionPolicy instance = "<<this<<std::endl;
+	std::cout<<"DecisionModel instance = "<<this<<std::endl;
 	std::cout<<"known_variance = "<<known_variance<<std::endl;
 	std::cout<<"conjugate_mu_prior = "<<conjugate_mu_prior<<std::endl;
 	std::cout<<"prior_mu_mean = "<<prior_mu_mean<<std::endl;
@@ -296,45 +296,45 @@ void DecisionPolicy::disp(){
 	std::cout<<"bound_strides = "<<bound_strides<<std::endl;
 }
 
-DecisionPolicy* DecisionPolicy::create(DecisionPolicyDescriptor& dpc){
+DecisionModel* DecisionModel::create(DecisionModelDescriptor& dpc){
 	if (dpc.known_variance()){
 		if (dpc.conjugate_mu_prior()){
-			return new DecisionPolicyConjPrior(dpc.model_var[0], dpc.prior_mu_mean, dpc.prior_mu_var,
+			return new DecisionModelConjPrior(dpc.model_var[0], dpc.prior_mu_mean, dpc.prior_mu_var,
 						   dpc.n, dpc.dt, dpc.T, dpc.reward, dpc.penalty,
 						   dpc.iti, dpc.tp, dpc.cost);
 		} else {
-			return new DecisionPolicyDiscretePrior(dpc.model_var[0], dpc.n_prior, dpc.mu_prior, dpc.weight_prior,
+			return new DecisionModelDiscretePrior(dpc.model_var[0], dpc.n_prior, dpc.mu_prior, dpc.weight_prior,
 						   dpc.n, dpc.dt, dpc.T, dpc.reward, dpc.penalty,
 						   dpc.iti, dpc.tp, dpc.cost);
 		}
 	} else {
-		return new DecisionPolicyUnknownDiscreteVar(dpc.n_model_var,dpc.model_var,
+		return new DecisionModelUnknownDiscreteVar(dpc.n_model_var,dpc.model_var,
 						   dpc.prior_var_prob, dpc.prior_mu_mean, dpc.prior_mu_var,
 						   dpc.n, dpc.dt, dpc.T, dpc.reward, dpc.penalty,
 						   dpc.iti, dpc.tp, dpc.cost);
 	}
 }
 
-DecisionPolicy* DecisionPolicy::create(DecisionPolicyDescriptor& dpc, double* ub, double* lb, int bound_strides){
+DecisionModel* DecisionModel::create(DecisionModelDescriptor& dpc, double* ub, double* lb, int bound_strides){
 	if (dpc.known_variance()){
 		if (dpc.conjugate_mu_prior()){
-			return new DecisionPolicyConjPrior(dpc.model_var[0], dpc.prior_mu_mean, dpc.prior_mu_var,
+			return new DecisionModelConjPrior(dpc.model_var[0], dpc.prior_mu_mean, dpc.prior_mu_var,
 						   dpc.n, dpc.dt, dpc.T, dpc.reward, dpc.penalty,
 						   dpc.iti, dpc.tp, dpc.cost, ub, lb, bound_strides);
 		} else {
-			return new DecisionPolicyDiscretePrior(dpc.model_var[0], dpc.n_prior, dpc.mu_prior, dpc.weight_prior,
+			return new DecisionModelDiscretePrior(dpc.model_var[0], dpc.n_prior, dpc.mu_prior, dpc.weight_prior,
 						   dpc.n, dpc.dt, dpc.T, dpc.reward, dpc.penalty,
 						   dpc.iti, dpc.tp, dpc.cost, ub, lb, bound_strides);
 		}
 	} else {
-		return new DecisionPolicyUnknownDiscreteVar(dpc.n_model_var,dpc.model_var,
+		return new DecisionModelUnknownDiscreteVar(dpc.n_model_var,dpc.model_var,
 						   dpc.prior_var_prob, dpc.prior_mu_mean, dpc.prior_mu_var,
 						   dpc.n, dpc.dt, dpc.T, dpc.reward, dpc.penalty,
 						   dpc.iti, dpc.tp, dpc.cost, ub, lb, bound_strides);
 	}
 }
 
-double DecisionPolicy::value_for_root_finding(double rho){
+double DecisionModel::value_for_root_finding(double rho){
 	/***
 	 * Function that serves as a proxy for the value root finding that
 	 * determines rho. Is the same as backpropagate_value(rho,false)
@@ -342,12 +342,12 @@ double DecisionPolicy::value_for_root_finding(double rho){
 	return this->backpropagate_value(rho,false);
 }
 
-double DecisionPolicy::iterate_rho_value(double tolerance){
+double DecisionModel::iterate_rho_value(double tolerance){
 	// Use arbitrary default upper and lower bounds
 	return this->iterate_rho_value(tolerance,-10.,10.);
 }
 
-double DecisionPolicy::iterate_rho_value(double tolerance, double lower_bound, double upper_bound){
+double DecisionModel::iterate_rho_value(double tolerance, double lower_bound, double upper_bound){
 	/***
 	 * Function that implements Brent's algorithm for root finding.
 	 * This function was adapted from brent.cpp written by John Burkardt,
@@ -476,7 +476,7 @@ double DecisionPolicy::iterate_rho_value(double tolerance, double lower_bound, d
 	return this->rho;
 }
 
-double* DecisionPolicy::x_ubound(){
+double* DecisionModel::x_ubound(){
 	/***
 	 * Compute the x space upper bound as a function of time. This
 	 * function creates a new double[] and returns it.
@@ -491,7 +491,7 @@ double* DecisionPolicy::x_ubound(){
 	}
 	return xb;
 }
-void DecisionPolicy::x_ubound(double* xb){
+void DecisionModel::x_ubound(double* xb){
 	/***
 	 * Compute the x space upper bound as a function of time. This
 	 * function places the values in the provided pointer. Beware of the
@@ -506,7 +506,7 @@ void DecisionPolicy::x_ubound(double* xb){
 	}
 }
 
-double* DecisionPolicy::x_lbound(){
+double* DecisionModel::x_lbound(){
 	/***
 	 * Compute the x space lower bound as a function of time. This
 	 * function creates a new double[] and returns it.
@@ -521,7 +521,7 @@ double* DecisionPolicy::x_lbound(){
 	}
 	return xb;
 }
-void DecisionPolicy::x_lbound(double* xb){
+void DecisionModel::x_lbound(double* xb){
 	/***
 	 * Compute the x space lower bound as a function of time. This
 	 * function places the values in the provided pointer. Beware of the
@@ -536,7 +536,7 @@ void DecisionPolicy::x_lbound(double* xb){
 	}
 }
 
-double DecisionPolicy::Psi(double mu, double model_var, double* bound, int itp, double tp, double x0, double t0){
+double DecisionModel::Psi(double mu, double model_var, double* bound, int itp, double tp, double x0, double t0){
 	double normpdf = 0.3989422804014327*exp(-0.5*pow(bound[itp]-x0-mu*(tp-t0),2)/model_var/(tp-t0))/sqrt(model_var*(tp-t0));
 	double bound_prime;
 	if (itp<this->nT-1){
@@ -548,7 +548,7 @@ double DecisionPolicy::Psi(double mu, double model_var, double* bound, int itp, 
 	return 0.5*normpdf*(bound_prime-(bound[itp]-x0)/(tp-t0));
 }
 
-void DecisionPolicy::rt(double mu, double model_var, double* g1, double* g2, double* xub, double* xlb){
+void DecisionModel::rt(double mu, double model_var, double* g1, double* g2, double* xub, double* xlb){
 	#ifdef DEBUG
 	std::cout<<"Entered rt"<<std::endl;
 	#endif
@@ -630,7 +630,7 @@ void DecisionPolicy::rt(double mu, double model_var, double* g1, double* g2, dou
 	if (delete_xlb) delete[] xlb;
 }
 
-void DecisionPolicy::fpt_conf_matrix(double* first_passage_time, int* first_passage_time_strides, int n_alternatives, int confidence_partition, double* confidence_response, int* confidence_response_strides, double* out){
+void DecisionModel::fpt_conf_matrix(double* first_passage_time, int* first_passage_time_strides, int n_alternatives, int confidence_partition, double* confidence_response, int* confidence_response_strides, double* out){
 	int decision_ind, t_ind, i, out_base_ind;
 	double prior_c_ind, c_ind, next_c_ind;
 	double ftp;
@@ -772,27 +772,27 @@ void DecisionPolicy::fpt_conf_matrix(double* first_passage_time, int* first_pass
 }
 
 /***
- * DecisionPolicyConjPrior is a class that implements the dynamic programing method
+ * DecisionModelConjPrior is a class that implements the dynamic programing method
  * that computes the value of a given belief state as a function of time.
  * 
  * This class implements the method given in Drugowitsch et al 2012 but
  * is limited to constant cost values.
 ***/
 
-DecisionPolicyConjPrior::~DecisionPolicyConjPrior(){
+DecisionModelConjPrior::~DecisionModelConjPrior(){
 	/***
 	 * Destructor
 	***/
 	#ifdef DEBUG
-	std::cout<<"Destroyed DecisionPolicyConjPrior instance"<<std::endl;
+	std::cout<<"Destroyed DecisionModelConjPrior instance"<<std::endl;
 	#endif
 }
 
-void DecisionPolicyConjPrior::disp(){
+void DecisionModelConjPrior::disp(){
 	/***
-	 * Print DecisionPolicyConjPrior instance's information
+	 * Print DecisionModelConjPrior instance's information
 	***/
-	std::cout<<"DecisionPolicyConjPrior instance = "<<this<<std::endl;
+	std::cout<<"DecisionModelConjPrior instance = "<<this<<std::endl;
 	std::cout<<"model_var = "<<model_var<<std::endl;
 	std::cout<<"prior_mu_mean = "<<prior_mu_mean<<std::endl;
 	std::cout<<"prior_mu_var = "<<prior_mu_var<<std::endl;
@@ -814,7 +814,7 @@ void DecisionPolicyConjPrior::disp(){
 	std::cout<<"lb = "<<lb<<std::endl;
 }
 
-double DecisionPolicyConjPrior::backpropagate_value(double rho, bool compute_bounds){
+double DecisionModelConjPrior::backpropagate_value(double rho, bool compute_bounds){
 	/***
 	 * Main function:
 	 * backpropagate_value(double rho, bool compute_bounds)
@@ -998,7 +998,7 @@ double DecisionPolicyConjPrior::backpropagate_value(double rho, bool compute_bou
 	return value[int(0.5*n)];
 }
 
-double DecisionPolicyConjPrior::backpropagate_value(double rho, bool compute_bounds, double* value, double* v_explore, double* v1, double* v2){
+double DecisionModelConjPrior::backpropagate_value(double rho, bool compute_bounds, double* value, double* v_explore, double* v1, double* v2){
 	/***
 	 * Main function:
 	 * backpropagate_value(double rho, bool compute_bounds, double* value, double* v_explore, double* v1, double* v2)
@@ -1183,7 +1183,7 @@ double DecisionPolicyConjPrior::backpropagate_value(double rho, bool compute_bou
 }
 
 
-DecisionPolicyDiscretePrior::~DecisionPolicyDiscretePrior(){
+DecisionModelDiscretePrior::~DecisionModelDiscretePrior(){
 	/***
 	 * Destructor
 	***/
@@ -1193,11 +1193,11 @@ DecisionPolicyDiscretePrior::~DecisionPolicyDiscretePrior(){
 		delete[] weight_prior;
 	}
 	#ifdef DEBUG
-	std::cout<<"Destroyed DecisionPolicyDiscretePrior instance"<<std::endl;
+	std::cout<<"Destroyed DecisionModelDiscretePrior instance"<<std::endl;
 	#endif
 }
 
-void DecisionPolicyDiscretePrior::set_prior(int n_prior,double* mu_prior, double* weight_prior){
+void DecisionModelDiscretePrior::set_prior(int n_prior,double* mu_prior, double* weight_prior){
 	int i;
 	double normalization = 0.;
 	this->n_prior = n_prior;
@@ -1229,11 +1229,11 @@ void DecisionPolicyDiscretePrior::set_prior(int n_prior,double* mu_prior, double
 	this->is_prior_set = true;
 }
 
-void DecisionPolicyDiscretePrior::disp(){
+void DecisionModelDiscretePrior::disp(){
 	/***
-	 * Print DecisionPolicyDiscretePrior instance's information
+	 * Print DecisionModelDiscretePrior instance's information
 	***/
-	std::cout<<"DecisionPolicyDiscretePrior instance = "<<this<<std::endl;
+	std::cout<<"DecisionModelDiscretePrior instance = "<<this<<std::endl;
 	std::cout<<"model_var = "<<model_var<<std::endl;
 	std::cout<<"mu_prior = "<<mu_prior<<std::endl;
 	std::cout<<"mu2_prior = "<<mu2_prior<<std::endl;
@@ -1256,7 +1256,7 @@ void DecisionPolicyDiscretePrior::disp(){
 	std::cout<<"lb = "<<lb<<std::endl;
 }
 
-double DecisionPolicyDiscretePrior::backpropagate_value(double rho, bool compute_bounds){
+double DecisionModelDiscretePrior::backpropagate_value(double rho, bool compute_bounds){
 	/***
 	 * Main function:
 	 * backpropagate_value(double rho, bool compute_bounds)
@@ -1471,7 +1471,7 @@ double DecisionPolicyDiscretePrior::backpropagate_value(double rho, bool compute
 	return value[int(0.5*n)];
 }
 
-double DecisionPolicyDiscretePrior::backpropagate_value(double rho, bool compute_bounds, double* value, double* v_explore, double* v1, double* v2){
+double DecisionModelDiscretePrior::backpropagate_value(double rho, bool compute_bounds, double* value, double* v_explore, double* v1, double* v2){
 	/***
 	 * Main function:
 	 * backpropagate_value(double rho, bool compute_bounds, double* value, double* v_explore, double* v1, double* v2)
@@ -1683,22 +1683,22 @@ double DecisionPolicyDiscretePrior::backpropagate_value(double rho, bool compute
 	return value[int(0.5*n)];
 }
 
-DecisionPolicyUnknownDiscreteVar::~DecisionPolicyUnknownDiscreteVar(){
+DecisionModelUnknownDiscreteVar::~DecisionModelUnknownDiscreteVar(){
 	/***
 	 * Destructor
 	***/
 	delete[] this->model_var;
 	delete[] this->prior_var_prob;
 	#ifdef DEBUG
-	std::cout<<"Destroyed DecisionPolicyUnknownDiscreteVar instance"<<std::endl;
+	std::cout<<"Destroyed DecisionModelUnknownDiscreteVar instance"<<std::endl;
 	#endif
 }
 
-void DecisionPolicyUnknownDiscreteVar::disp(){
+void DecisionModelUnknownDiscreteVar::disp(){
 	/***
-	 * Print DecisionPolicyConjPrior instance's information
+	 * Print DecisionModelConjPrior instance's information
 	***/
-	std::cout<<"DecisionPolicyUnknownDiscreteVar instance = "<<this<<std::endl;
+	std::cout<<"DecisionModelUnknownDiscreteVar instance = "<<this<<std::endl;
 	std::cout<<"n_model_var = "<<n_model_var<<std::endl;
 	int i;
 	std::cout<<"model_var = [";
@@ -1731,7 +1731,7 @@ void DecisionPolicyUnknownDiscreteVar::disp(){
 	std::cout<<"lb = "<<lb<<std::endl;
 }
 
-double DecisionPolicyUnknownDiscreteVar::backpropagate_value(double rho, bool compute_bounds){
+double DecisionModelUnknownDiscreteVar::backpropagate_value(double rho, bool compute_bounds){
 	/***
 	 * Main function:
 	 * backpropagate_value(double rho, bool compute_bounds)
@@ -1925,7 +1925,7 @@ double DecisionPolicyUnknownDiscreteVar::backpropagate_value(double rho, bool co
 	return value[int(0.5*n)];
 }
 
-double DecisionPolicyUnknownDiscreteVar::backpropagate_value(double rho, bool compute_bounds, double* value, double* v_explore, double* v1, double* v2){
+double DecisionModelUnknownDiscreteVar::backpropagate_value(double rho, bool compute_bounds, double* value, double* v_explore, double* v1, double* v2){
 	/***
 	 * Main function:
 	 * backpropagate_value(double rho, bool compute_bounds, double* value, double* v_explore, double* v1, double* v2)

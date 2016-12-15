@@ -13,7 +13,7 @@ from __future__ import division, print_function, absolute_import, unicode_litera
 import numpy as np
 from scipy import optimize
 from scipy import stats
-import math, os, warnings
+import math, os, warnings, json, re
 
 
 a = np.array([ 0.886226899, -1.645349621,  0.914624893, -0.140543331])
@@ -462,9 +462,9 @@ def maximize_figure(fig=None):
 	# Revert the current figure to the one prior to the call to maximize_figure
 	plt.figure(current_figure.number)
 
-def parse_options_file():
+def parse_details_file():
 	def clean_str(s):
-		return s.partition('#')[0].strip(' \t\n\r')
+		return s.partition('#')[0].strip(' \t'+os.linesep)
 	def array_parser(x):
 		x = x.strip(' \t\n\r')
 		if x.startswith('[') and x.endswith(']'):
@@ -484,11 +484,23 @@ def parse_options_file():
 				return float('inf')
 			else:
 				raise ValueError('Cannot interpret value given to time_available_to_respond')
+	def extension_parser(x):
+		x = str(x).strip()
+		if not x.startswith('.'):
+			x = '.'+x
+		return x
+	def data_structure_parser(x):
+		try:
+			return json.loads(x)
+		except:
+			print(x)
+			raise
 	options = {u'raw_data_dir':None,
 				u'experiment_details':{}}
-	valid_decision_policy_keys = ['tp','T','iti','dt','external_var','n','reward','penalty','prior_var_prob']
+	valid_decision_model_keys = ['tp','T','iti','dt','external_var','n','reward','penalty','prior_var_prob']
 	valid_fitter_keys = ['rt_cutoff','distractor','forced_non_decision_time','ISI','rt_measured_from_stim_end','time_available_to_respond']
-	valid_experiment_details_keys = valid_decision_policy_keys+valid_fitter_keys
+	valid_io_keys = ['session_parser','file_extension','time_conversion_to_seconds','excluded_files','data_structure']
+	valid_experiment_details_keys = valid_decision_model_keys+valid_fitter_keys+valid_io_keys
 	key_value_handler = {'tp':lambda x:float(x),
 						 'ISI':lambda x:float(x),
 						 'T':lambda x:float(x),
@@ -502,13 +514,29 @@ def parse_options_file():
 						 'distractor':lambda x:float(x),
 						 'forced_non_decision_time':lambda x:float(x),
 						 'prior_var_prob':array_parser,
-						 'rt_measured_from_stim_end': lambda x: True if x.lower() in ['1','true'] else False,
-						 'time_available_to_respond': time_available_to_respond_handler}
-	with open('fits_options.txt','r') as f:
+						 'rt_measured_from_stim_end': lambda x: bool(x) if x.lower().strip() not in ['true','false'] else x.lower().strip()=='true',
+						 'time_available_to_respond': time_available_to_respond_handler,
+						 'session_parser': lambda x: eval(x),
+						 'file_extension': extension_parser,
+						 'time_conversion_to_seconds': lambda x:float(x),
+						 'data_structure': data_structure_parser,
+						 'excluded_files': lambda x: re.compile(x)}
+	with open('experiment_details.txt','r') as f:
+		buf = ''
 		in_experiment = False
 		experiment_name = None
+		multiline_value = False
 		for lineno,line in enumerate(f):
 			line = clean_str(line)
+			if line.endswith('\\'):
+				if not multiline_value:
+					multiline_value = True
+				buf+=line.rstrip('\\')
+				continue
+			if multiline_value:
+				line = buf+line
+				buf = ''
+				multiline_value = False
 			if len(line)==0:
 				continue
 			if not in_experiment:
@@ -520,7 +548,7 @@ def parse_options_file():
 					if len(experiment_name)==0:
 						raise IOError('Invalid options file. Encountered empty experiment name. Line number {0}'.format(lineno+1))
 					elif not experiment_name in options['experiment_details'].keys():
-						options['experiment_details'][experiment_name] = {'DecisionPolicy':{},'Fitter':{}}
+						options['experiment_details'][experiment_name] = {'DecisionModel':{},'Fitter':{},'IO':{}}
 					else:
 						raise IOError('Invalid options file. Encountered a repeated begin experiment statement for experiment "{1}". Line number {0}'.format(lineno+1,experiment_name))
 				elif line.startswith('end experiment'):
@@ -541,14 +569,17 @@ def parse_options_file():
 						experiment_name = None
 				else:
 					key,_,value = line.partition(':')
+					value = value.strip()
 					if not key in valid_experiment_details_keys:
 						raise IOError('Invalid options file. Encountered invalid key {0} at line {1}. Valid key names are:\n {2}\n'.format(key,lineno+1,valid_experiment_details_keys))
 					elif len(value)==0:
 						raise IOError('Invalid options file. Encountered experiment detail key with empty value. Line number {0}'.format(lineno+1))
-					if key in valid_decision_policy_keys:
-						options['experiment_details'][experiment_name]['DecisionPolicy'][key] = key_value_handler[key](value)
+					if key in valid_decision_model_keys:
+						options['experiment_details'][experiment_name]['DecisionModel'][key] = key_value_handler[key](value)
 					elif key in valid_fitter_keys:
 						options['experiment_details'][experiment_name]['Fitter'][key] = key_value_handler[key](value)
+					elif key in valid_io_keys:
+						options['experiment_details'][experiment_name]['IO'][key] = key_value_handler[key](value)
 		if in_experiment:
 			raise IOError('Invalid options file. Encountered end of file but experiment "{0}" was not closed'.format(experiment_name))
 	if not os.path.isdir(options['raw_data_dir']):

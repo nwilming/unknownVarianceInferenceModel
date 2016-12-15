@@ -5,8 +5,8 @@ first passage time probability density computations
 Author: Luciano Paz
 Year: 2016
 ***/
-#ifndef __DecisionPolicy
-#define __DecisionPolicy
+#ifndef __DecisionModel
+#define __DecisionModel
 
 #include <cmath>
 #include <cstddef>
@@ -62,7 +62,7 @@ inline double normcdfinv(double y, double mu, double sigma){
 	return 1.4142135623730951*sigma*erfinv(2.*(y-0.5))+mu;
 }
 
-class DecisionPolicyDescriptor {
+class DecisionModelDescriptor {
 protected:
 	bool _owns_cost;
 	bool _known_variance;
@@ -93,23 +93,23 @@ public:
 	double *mu_prior;
 	double *weight_prior;
 	
-	DecisionPolicyDescriptor(double model_var, double prior_mu_mean, double prior_mu_var,
+	DecisionModelDescriptor(double model_var, double prior_mu_mean, double prior_mu_var,
 				   int n, double dt, double T, double reward, double penalty,
 				   double iti, double tp, double* cost, bool owns_cost);
-	DecisionPolicyDescriptor(double model_var, int n_prior, double* mu_prior, double* weight_prior,
+	DecisionModelDescriptor(double model_var, int n_prior, double* mu_prior, double* weight_prior,
 				   int n, double dt, double T, double reward, double penalty,
 				   double iti, double tp, double* cost, bool owns_cost);
-	DecisionPolicyDescriptor(int n_model_var, double* model_var,
+	DecisionModelDescriptor(int n_model_var, double* model_var,
 				   double* prior_var_prob, double prior_mu_mean, double prior_mu_var,
 				   int n, double dt, double T, double reward, double penalty,
 				   double iti, double tp, double* cost, bool owns_cost);
 	
-	~DecisionPolicyDescriptor();
+	~DecisionModelDescriptor();
 	
 	void disp();
 };
 
-class DecisionPolicy {
+class DecisionModel {
 public:
 	bool owns_bounds;
 	bool known_variance;
@@ -136,18 +136,18 @@ public:
 	double *ub;
 	double *lb;
 	
-	DecisionPolicy(bool known_variance, bool conjugate_mu_prior,
+	DecisionModel(bool known_variance, bool conjugate_mu_prior,
 				   double prior_mu_mean, double prior_mu_var,
 				   int n, double dt, double T, double reward, double penalty,
 				   double iti, double tp, double* cost);
-	DecisionPolicy(bool known_variance, bool conjugate_mu_prior,
+	DecisionModel(bool known_variance, bool conjugate_mu_prior,
 				   double prior_mu_mean, double prior_mu_var,
 				   int n, double dt, double T, double reward, double penalty,
 				   double iti, double tp, double* cost, double* ub, double* lb,int bound_strides);
-	virtual ~DecisionPolicy();
+	virtual ~DecisionModel();
 	
-	static DecisionPolicy* create(DecisionPolicyDescriptor& dpc);
-	static DecisionPolicy* create(DecisionPolicyDescriptor& dpc, double* ub, double* lb, int bound_strides);
+	static DecisionModel* create(DecisionModelDescriptor& dpc);
+	static DecisionModel* create(DecisionModelDescriptor& dpc, double* ub, double* lb, int bound_strides);
 	
 	virtual void disp();
 	
@@ -173,23 +173,23 @@ public:
 	void fpt_conf_matrix(double* first_passage_time, int* first_passage_time_strides, int n_alternatives, int confidence_partition, double* confidence_response, int* confidence_response_strides, double* out);
 };
 
-class DecisionPolicyConjPrior : public DecisionPolicy {
+class DecisionModelConjPrior : public DecisionModel {
 public:
 	double model_var;
 	
-	DecisionPolicyConjPrior(double model_var, double prior_mu_mean, double prior_mu_var,
+	DecisionModelConjPrior(double model_var, double prior_mu_mean, double prior_mu_var,
 				   int n, double dt, double T, double reward, double penalty,
 				   double iti, double tp, double* cost):
-			DecisionPolicy(true, true, prior_mu_mean, prior_mu_var, n, dt, T, reward, penalty, iti, tp, cost){
+			DecisionModel(true, true, prior_mu_mean, prior_mu_var, n, dt, T, reward, penalty, iti, tp, cost){
 				this->model_var = model_var;
 			};
-	DecisionPolicyConjPrior(double model_var, double prior_mu_mean, double prior_mu_var,
+	DecisionModelConjPrior(double model_var, double prior_mu_mean, double prior_mu_var,
 				   int n, double dt, double T, double reward, double penalty,
 				   double iti, double tp, double* cost, double* ub, double* lb,int bound_strides):
-			DecisionPolicy(true, true, prior_mu_mean, prior_mu_var, n, dt, T, reward, penalty, iti, tp, cost, ub, lb, bound_strides){
+			DecisionModel(true, true, prior_mu_mean, prior_mu_var, n, dt, T, reward, penalty, iti, tp, cost, ub, lb, bound_strides){
 				this->model_var = model_var;
 			};
-	~DecisionPolicyConjPrior();
+	~DecisionModelConjPrior();
 	
 	void disp();
 	
@@ -229,7 +229,7 @@ public:
 	double backpropagate_value(double rho, bool compute_bounds, double* value, double* v_explore, double* v1, double* v2);
 };
 
-class DecisionPolicyDiscretePrior : public DecisionPolicy {
+class DecisionModelDiscretePrior : public DecisionModel {
 protected:
 	int n_prior;
 	bool is_prior_set;
@@ -243,10 +243,10 @@ protected:
 public:
 	double model_var;
 	
-	DecisionPolicyDiscretePrior(double model_var, int n_prior,double* mu_prior, double* weight_prior,
+	DecisionModelDiscretePrior(double model_var, int n_prior,double* mu_prior, double* weight_prior,
 				   int n, double dt, double T, double reward, double penalty,
 				   double iti, double tp, double* cost):
-		DecisionPolicy(true, false, 0., 0., n, dt, T, reward, penalty, iti, tp, cost)
+		DecisionModel(true, false, 0., 0., n, dt, T, reward, penalty, iti, tp, cost)
 	{
 		/***
 		 * Constructor that shares its bound arrays
@@ -257,13 +257,13 @@ public:
 		this->set_prior(n_prior,mu_prior,weight_prior);
 		this->g2x_tolerance = 1e-12;
 		#ifdef DEBUG
-		std::cout<<"Created DecisionPolicyDiscretePrior instance at "<<this<<std::endl;
+		std::cout<<"Created DecisionModelDiscretePrior instance at "<<this<<std::endl;
 		#endif
 	};
-	DecisionPolicyDiscretePrior(double model_var, int n_prior,double* mu_prior, double* weight_prior,
+	DecisionModelDiscretePrior(double model_var, int n_prior,double* mu_prior, double* weight_prior,
 				   int n, double dt, double T, double reward, double penalty,
 				   double iti, double tp, double* cost, double* ub, double* lb,int bound_strides):
-		DecisionPolicy(true, false, 0., 0., n, dt, T, reward, penalty, iti, tp, cost, ub, lb, bound_strides)
+		DecisionModel(true, false, 0., 0., n, dt, T, reward, penalty, iti, tp, cost, ub, lb, bound_strides)
 	{
 		/***
 		 * Constructor that shares its bound arrays
@@ -274,10 +274,10 @@ public:
 		this->set_prior(n_prior,mu_prior,weight_prior);
 		this->g2x_tolerance = 1e-12;
 		#ifdef DEBUG
-		std::cout<<"Created DecisionPolicyDiscretePrior instance at "<<this<<std::endl;
+		std::cout<<"Created DecisionModelDiscretePrior instance at "<<this<<std::endl;
 		#endif
 	};
-	~DecisionPolicyDiscretePrior();
+	~DecisionModelDiscretePrior();
 	
 	void set_prior(int n_prior,double* mu_prior, double* weight_prior);
 	double get_epsilon(){return this->epsilon;};
@@ -437,17 +437,17 @@ public:
 	double backpropagate_value(double rho, bool compute_bounds, double* value, double* v_explore, double* v1, double* v2);
 };
 
-class DecisionPolicyUnknownDiscreteVar : public DecisionPolicy {
+class DecisionModelUnknownDiscreteVar : public DecisionModel {
 public:
 	int n_model_var;
 	double* model_var;
 	double* prior_var_prob;
 	
-	DecisionPolicyUnknownDiscreteVar(int n_model_var, double* model_var,
+	DecisionModelUnknownDiscreteVar(int n_model_var, double* model_var,
 				   double* prior_var_prob, double prior_mu_mean, double prior_mu_var,
 				   int n, double dt, double T, double reward, double penalty,
 				   double iti, double tp, double* cost):
-			DecisionPolicy(false, true, prior_mu_mean, prior_mu_var, n, dt, T, reward, penalty, iti, tp, cost){
+			DecisionModel(false, true, prior_mu_mean, prior_mu_var, n, dt, T, reward, penalty, iti, tp, cost){
 					this->n_model_var = n_model_var;
 					this->model_var = new double[n_model_var];
 					this->prior_var_prob = new double[n_model_var];
@@ -456,11 +456,11 @@ public:
 						this->prior_var_prob[i] = prior_var_prob[i];
 					}
 				};
-	DecisionPolicyUnknownDiscreteVar(int n_model_var, double* model_var,
+	DecisionModelUnknownDiscreteVar(int n_model_var, double* model_var,
 				   double* prior_var_prob, double prior_mu_mean, double prior_mu_var,
 				   int n, double dt, double T, double reward, double penalty,
 				   double iti, double tp, double* cost, double* ub, double* lb,int bound_strides):
-			DecisionPolicy(false, true, prior_mu_mean, prior_mu_var, n, dt, T, reward, penalty, iti, tp, cost, ub, lb, bound_strides){
+			DecisionModel(false, true, prior_mu_mean, prior_mu_var, n, dt, T, reward, penalty, iti, tp, cost, ub, lb, bound_strides){
 					this->n_model_var = n_model_var;
 					this->model_var = new double[n_model_var];
 					this->prior_var_prob = new double[n_model_var];
@@ -469,7 +469,7 @@ public:
 						this->prior_var_prob[i] = prior_var_prob[i];
 					}
 				};
-	~DecisionPolicyUnknownDiscreteVar();
+	~DecisionModelUnknownDiscreteVar();
 	
 	void disp();
 	

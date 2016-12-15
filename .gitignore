@@ -24,6 +24,7 @@ lib64/*
 
 # Fits directory
 fits_cognition/*
+raw_data_dir/*
 *.tar
 *.tar.gz
 
