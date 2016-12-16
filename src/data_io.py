@@ -233,7 +233,7 @@ class SubjectSession:
 			session = self.session_parser(f)
 			raw_data = self.raw_data_loader(f)
 			
-			mandatory_fields = ['contrast','rt','performance','confidence']
+			mandatory_fields = ['contrast','rt','performance','confidence'] # variance is another important field if the fits are done with an unknown variance decision model
 			fields = []
 			for mf in mandatory_fields:
 				if mf not in self.data_fields:

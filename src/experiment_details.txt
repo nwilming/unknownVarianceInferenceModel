@@ -1,8 +1,8 @@
 raw_data_dir: raw_data_dir/
 
 begin experiment TestExperimentName
+	#----- DecisionModel keys -----#
 	tp: 0.
-	ISI: 0.04
 	T: 5.
 	iti: 3. 
 	dt: 1e-3
@@ -11,20 +11,33 @@ begin experiment TestExperimentName
 	n: 101
 	# external_var can be a float or a list of floats (e.g. [10.,20.,30.])
 	external_var: 1000. # The external_var units must be stimulus variance over time (e.g. contrast**2/s).
-	rt_cutoff: 14.
-	distractor: 0.
-	forced_non_decision_time: 0.
 	# prior_var_prob is only used if external_var is a list.
 	# It represents the prior probability of each variance.
 	# The probabilities are normalized when they are loaded.
 	prior_var_prob: [0.3,0.3,0.3]
+	#----- Fitter keys -----#
+	ISI: 0.04
+	rt_cutoff: 14.
+	distractor: 0.
+	forced_non_decision_time: 0.
 	rt_measured_from_stim_end: False # If False, rt are measured from stim start. If True, they are measured from the stim end
 	time_available_to_respond: inf
+	is_binary_confidence: True # Can be True or False to indicate if the confidence data is binary or not
+	#----- IO keys -----#
+	# session_parser: A lambda expression or callable that is able to parse the session number from the data filename
+	# file_extension: A str with the data file extension
+	# time_conversion_to_seconds: A float that will be multiplied to the RT data to convert the units to seconds
+	# data_structure: A json structure with fields "delimiter" and "data_fields"
+	#				 "data_fields" must also be a json structure whose
+	#				 field names equal to the measured fields, and whose
+	#				 values must be lambda expressions or callables that
+	#				 will extract the field name data from the loaded
+	#				 raw data
 end experiment TestExperimentName
 
 begin experiment exp1
+	#----- DecisionModel keys -----#
 	tp: 0.
-	ISI: 0.1
 	T: 1.
 	iti: 3.
 	dt: 0.008
@@ -32,10 +45,14 @@ begin experiment exp1
 	n: 101
 	reward: 1.
 	penalty: 0.
+	#----- Fitter keys -----#
+	ISI: 0.1
 	distractor: 50.
 	forced_non_decision_time: 0.
 	rt_measured_from_stim_end: False
 	time_available_to_respond: 1.
+	is_binary_confidence: False
+	#----- IO keys -----#
 	session_parser: lambda f: (int(re.search('(?<=_B)[0-9]+(?=_)',f).group())-1)//4+1
 	file_extension: .mat
 	time_conversion_to_seconds: 1e-3
@@ -47,8 +64,8 @@ begin experiment exp1
 end experiment exp1
 
 begin experiment exp2
+	#----- DecisionModel keys -----#
 	tp: 0.
-	ISI: 0.5
 	T: .3
 	iti: 2.
 	dt: 0.005
@@ -56,25 +73,29 @@ begin experiment exp2
 	n: 101
 	reward: 1.
 	penalty: 0.
+	#----- Fitter keys -----#
+	ISI: 0.5
 	distractor: 0.
 	forced_non_decision_time: 0.3
 	rt_measured_from_stim_end: True
+	is_binary_confidence: False
+	#----- IO keys -----#
 	session_parser: lambda f: int(re.search('(?<=sesion)[0-9]+',f).group())
 	file_extension: .mat
 	time_conversion_to_seconds: 1.
 	excluded_files: (.*)quest.mat
-	data_structure: {"data_fields":{"contrast": "lambda x: x['QQ']",\
-									"rt": "lambda x: x['RT']",\
-									"performance": "lambda x: x['correct']",\
-									"confidence": "lambda x: x['SEGU']",\
-									"selected_side": "lambda x: x['RTA']",\
-									"confidence_rt": "lambda x: x['SEGUTIME']",\
-									"target_location": "lambda x: x['orden']"}}
+	data_structure: {"data_fields":{"contrast": "lambda x: x['QQ'][0]",\
+									"rt": "lambda x: x['RT'][0]",\
+									"performance": "lambda x: x['correct'][0]",\
+									"confidence": "lambda x: x['SEGU'][0]",\
+									"selected_side": "lambda x: x['RTA'][0]",\
+									"confidence_rt": "lambda x: x['SEGUTIME'][0]",\
+									"target_location": "lambda x: x['orden'][0]"}}
 end experiment exp2
 
 begin experiment exp3
+	#----- DecisionModel keys -----#
 	tp: 0.
-	ISI: 0.3
 	T: 0.3
 	iti: 1.5
 	dt: 0.005
@@ -82,9 +103,13 @@ begin experiment exp3
 	n: 101
 	reward: 1.
 	penalty: 0.
+	#----- Fitter keys -----#
+	ISI: 0.3
 	distractor: 0.
 	forced_non_decision_time: 0.
 	rt_measured_from_stim_end: False
+	is_binary_confidence: False
+	#----- IO keys -----#
 	session_parser: lambda f: int(re.search('(?<=sesion)[0-9]+',f).group())
 	file_extension: .txt
 	time_conversion_to_seconds: 1.

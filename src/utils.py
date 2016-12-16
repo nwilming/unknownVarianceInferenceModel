@@ -498,7 +498,7 @@ def parse_details_file():
 	options = {u'raw_data_dir':None,
 				u'experiment_details':{}}
 	valid_decision_model_keys = ['tp','T','iti','dt','external_var','n','reward','penalty','prior_var_prob']
-	valid_fitter_keys = ['rt_cutoff','distractor','forced_non_decision_time','ISI','rt_measured_from_stim_end','time_available_to_respond']
+	valid_fitter_keys = ['rt_cutoff','distractor','forced_non_decision_time','ISI','rt_measured_from_stim_end','time_available_to_respond','is_binary_confidence']
 	valid_io_keys = ['session_parser','file_extension','time_conversion_to_seconds','excluded_files','data_structure']
 	valid_experiment_details_keys = valid_decision_model_keys+valid_fitter_keys+valid_io_keys
 	key_value_handler = {'tp':lambda x:float(x),
@@ -515,6 +515,7 @@ def parse_details_file():
 						 'forced_non_decision_time':lambda x:float(x),
 						 'prior_var_prob':array_parser,
 						 'rt_measured_from_stim_end': lambda x: bool(x) if x.lower().strip() not in ['true','false'] else x.lower().strip()=='true',
+						 'is_binary_confidence': lambda x: bool(x) if x.lower().strip() not in ['true','false'] else x.lower().strip()=='true',
 						 'time_available_to_respond': time_available_to_respond_handler,
 						 'session_parser': lambda x: eval(x),
 						 'file_extension': extension_parser,

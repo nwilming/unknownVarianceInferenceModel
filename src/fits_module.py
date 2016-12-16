@@ -349,7 +349,7 @@ _fit_output = {_fit_output}
 			decisionModelKwArgs = experiment_details[self.experiment]['DecisionModel'].copy()
 			decisionModelKwArgs.update(self.decisionModelKwArgs)
 			self.logger.debug('Will construct DecisionModel instance with the folling kwargs:\n{0}'.format(decisionModelKwArgs))
-			self.dp = DecisionModel(**decisionModelKwArgs)
+			self.dm = DecisionModel(**decisionModelKwArgs)
 			if 'time_available_to_respond' in experiment_details[self.experiment]['Fitter']:
 				self._time_available_to_respond = experiment_details[self.experiment]['Fitter']['time_available_to_respond']
 			else:
@@ -380,6 +380,11 @@ _fit_output = {_fit_output}
 			else:
 				self._rt_measured_from_stim_end = False
 			self.logger.debug('Set rt_measured_from_stim_end = {0}'.format(self._rt_measured_from_stim_end))
+			if 'is_binary_confidence' in experiment_details[self.experiment]['Fitter']:
+				self._is_binary_confidence = experiment_details[self.experiment]['Fitter']['is_binary_confidence']
+			else:
+				self._is_binary_confidence = False
+			self.logger.debug('Set is_binary_confidence = {0}'.format(self._is_binary_confidence))
 		except KeyError:
 			raise ValueError('Experiment {0} not specified in fits_options.txt.\nPlease specify the experiment details before attempting to fit its data.'.format(self.experiment))
 		self.logger.debug('Setted Fitter experiment = %s',self.experiment)
@@ -417,8 +422,11 @@ _fit_output = {_fit_output}
 		self.contrast = (dat['contrast']-self._distractor)/self._ISI
 		self.performance = dat['performance']
 		self.confidence = dat['confidence']
-		if not self.dp.known_variance():
-			self.external_var = dat[:,self.subjectSession.column_description().index('external_var')]
+		if not self.dm.known_variance():
+			try:
+				self.external_var = dat['variance']/self._ISI
+			except:
+				raise RuntimeError('Cannot perform fits for unknown variance DecisionModel if the data does not have a "variance" field')
 			self.unique_stim,self.stim_indeces,counts = utils.unique_rows(np.array([self.contrast,self.external_var]).T,return_inverse=True,return_counts=True)
 			self.stim_probs = count.astype(np.float64)/np.sum(count.astype(np.float64))
 		self.logger.debug('Trials loaded = %d',len(self.performance))
@@ -801,7 +809,7 @@ _fit_output = {_fit_output}
 			distribution for the times that are in conv_x.
 		
 		"""
-		return self.dp.get_dead_time_convolver(parameters['dead_time'],parameters['dead_time_sigma'])
+		return self.dm.get_dead_time_convolver(parameters['dead_time'],parameters['dead_time_sigma'])
 	
 	def get_key(self,merge=None):
 		"""
@@ -887,7 +895,7 @@ _fit_output = {_fit_output}
 		model_hit_histogram2d = model[0]
 		model_miss_histogram2d = model[1]
 		model_rt = np.sum(model,axis=1)
-		model_confidence = np.sum(model,axis=2)*self.dp.dt
+		model_confidence = np.sum(model,axis=2)*self.dm.dt
 		
 		key = self.get_key(merge)
 		output = {key:{'experimental':{'hit_histogram':subject_hit_histogram2d,
@@ -962,17 +970,20 @@ _fit_output = {_fit_output}
 		the confidence reports.
 		
 		"""
-		if self.binary_split_method=='median':
-			split = np.median(self.confidence)
-		elif self.binary_split_method=='half':
-			split = 0.5
-		elif self.binary_split_method=='mean':
-			split = np.mean(self.confidence)
+		if self._is_binary_confidence:
+			return self.confidence
 		else:
-			raise NotImplementedError("The split method {0} is not implemented".format(split_method))
-		binary_confidence = np.ones_like(self.confidence)
-		binary_confidence[self.confidence<split] = 0
-		return binary_confidence
+			if self.binary_split_method=='median':
+				split = np.median(self.confidence)
+			elif self.binary_split_method=='half':
+				split = 0.5
+			elif self.binary_split_method=='mean':
+				split = np.mean(self.confidence)
+			else:
+				raise NotImplementedError("The split method {0} is not implemented".format(split_method))
+			binary_confidence = np.ones_like(self.confidence)
+			binary_confidence[self.confidence<split] = 0
+			return binary_confidence
 	
 	# Defaults
 	
@@ -1015,7 +1026,7 @@ _fit_output = {_fit_output}
 					from scipy.optimize import minimize
 					with warnings.catch_warnings():
 						warnings.simplefilter("ignore")
-						if self.dp.known_variance():
+						if self.dm.known_variance():
 							fun = lambda a: (np.mean(self.performance)-np.sum(self.mu_prob/(1.+np.exp(-0.596*self.mu/a))))**2
 						else:
 							fun = lambda a: (np.mean(self.performance)-np.sum(self.stim_prob/(1.+np.exp(-0.596*self.unique_stims[:,0]/np.sqrt(self.unique_stims[:,1]+a**2)))))**2
@@ -1040,21 +1051,21 @@ _fit_output = {_fit_output}
 			must_make_expensive_guess = ((not 'dead_time_sigma' in self.__default_start_point__.keys()) or\
 										((not 'high_confidence_threshold' in self.__default_start_point__.keys()) and self.method!='full'))
 			if must_make_expensive_guess:
-				self.dp.set_cost(self.__default_start_point__['cost'])
-				self.dp.set_internal_var(self.__default_start_point__['internal_var'])
-				xub,xlb = self.dp.xbounds()
+				self.dm.set_cost(self.__default_start_point__['cost'])
+				self.dm.set_internal_var(self.__default_start_point__['internal_var'])
+				xub,xlb = self.dm.xbounds()
 				first_passage_pdf = None
 				for drift,drift_prob in zip(self.mu,self.mu_prob):
-					gs = np.array(self.dp.rt(drift,bounds=(xub,xlb)))
+					gs = np.array(self.dm.rt(drift,bounds=(xub,xlb)))
 					if first_passage_pdf is None:
 						first_passage_pdf = gs*drift_prob
 					else:
 						first_passage_pdf+= gs*drift_prob
-				first_passage_pdf/=(np.sum(first_passage_pdf)*self.dp.dt)
+				first_passage_pdf/=(np.sum(first_passage_pdf)*self.dm.dt)
 				
 				if not 'dead_time_sigma' in self.__default_start_point__.keys() or self.__default_start_point__['dead_time_sigma'] is None:
-					mean_pdf = np.sum(first_passage_pdf*self.dp.t)*self.dp.dt
-					var_pdf = np.sum(first_passage_pdf*(self.dp.t-mean_pdf)**2)*self.dp.dt
+					mean_pdf = np.sum(first_passage_pdf*self.dm.t)*self.dm.dt
+					var_pdf = np.sum(first_passage_pdf*(self.dm.t-mean_pdf)**2)*self.dm.dt
 					var_rt = np.var(self.rt)
 					min_dead_time_sigma_sp = 0.01
 					if var_rt-var_pdf>0:
@@ -1063,14 +1074,14 @@ _fit_output = {_fit_output}
 						self.__default_start_point__['dead_time_sigma'] = min_dead_time_sigma_sp
 				
 				rt_mode_ind = np.argmax(first_passage_pdf[0])
-				rt_mode_ind+= 4 if self.dp.nT-rt_mode_ind>4 else 0
+				rt_mode_ind+= 4 if self.dm.nT-rt_mode_ind>4 else 0
 				if not 'high_confidence_threshold' in self.__default_start_point__.keys() or self.__default_start_point__['high_confidence_threshold'] is None:
 					if self.confidence_mapping_method=='log_odds':
-						log_odds = self.dp.log_odds()
+						log_odds = self.dm.log_odds()
 						self.__default_start_point__['high_confidence_threshold'] = log_odds[0][rt_mode_ind]
 					elif self.confidence_mapping_method=='belief':
-						bounds = self.dp.bounds
-						self.__default_start_point__['high_confidence_threshold'] = 2*self.dp.bounds[0][rt_mode_ind]-1
+						bounds = self.dm.bounds
+						self.__default_start_point__['high_confidence_threshold'] = 2*self.dm.bounds[0][rt_mode_ind]-1
 			else:
 				if not 'high_confidence_threshold' in self.__default_start_point__.keys() or self.__default_start_point__['high_confidence_threshold'] is None:
 					self.__default_start_point__['high_confidence_threshold'] = 0.3
@@ -1096,19 +1107,19 @@ _fit_output = {_fit_output}
 		if self.confidence_mapping_method=='log_odds':
 			if invariant_decision_bounds:
 				try:
-					log_odds = self.dp.log_odds()
+					log_odds = self.dm.log_odds()
 					mb = np.min(log_odds)
 					Mb = np.max(log_odds)
 					defaults['high_confidence_threshold'] = [mb,Mb]
 				except:
-					defaults['high_confidence_threshold'] = [0.,np.log(self.dp.g[-1]/(1.-self.dp.g[-1]))]
+					defaults['high_confidence_threshold'] = [0.,np.log(self.dm.g[-1]/(1.-self.dm.g[-1]))]
 			else:
-				defaults['high_confidence_threshold'] = [0.,np.log(self.dp.g[-1]/(1.-self.dp.g[-1]))]
+				defaults['high_confidence_threshold'] = [0.,np.log(self.dm.g[-1]/(1.-self.dm.g[-1]))]
 		elif self.confidence_mapping_method=='belief':
 			if invariant_decision_bounds:
 				try:
-					mb = min([2*np.min(self.dp.bounds[0])-1,1-2*np.min(self.dp.bounds[1])])-1e-3
-					Mb = max([2*np.max(self.dp.bounds[0])-1,1-2*np.max(self.dp.bounds[1])])+1e-3
+					mb = min([2*np.min(self.dm.bounds[0])-1,1-2*np.min(self.dm.bounds[1])])-1e-3
+					Mb = max([2*np.max(self.dm.bounds[0])-1,1-2*np.max(self.dm.bounds[1])])+1e-3
 					defaults['high_confidence_threshold'] = [mb,Mb]
 				except:
 					defaults['high_confidence_threshold'] = [-0.001,1.001]
@@ -1168,16 +1179,28 @@ _fit_output = {_fit_output}
 			self.set_fit_arguments(fit_arguments)
 		
 		minimizer = self.init_minimizer(self.start_point,self.bounds,self.optimizer_kwargs)
-		if self.method=='full':
-			merit_function = self.full_merit
-		elif self.method=='confidence_only':
-			merit_function = self.confidence_only_merit
-		elif self.method=='full_confidence':
-			merit_function = self.full_confidence_merit
-		elif self.method=='binary_confidence_only':
-			merit_function = self.binary_confidence_only_merit
-		elif self.method=='full_binary_confidence':
-			merit_function = self.full_binary_confidence_merit
+		if self._is_binary_confidence:
+			if self.method=='full':
+				merit_function = self.full_merit
+			elif self.method in ['binary_confidence_only','confidence_only']:
+				merit_function = self.binary_confidence_only_merit
+			elif self.method in ['full_binary_confidence','full_confidence']:
+				merit_function = self.full_binary_confidence_merit
+			else:
+				raise ValueError('Unknown method {0}'.format(self.method))
+		else:
+			if self.method=='full':
+				merit_function = self.full_merit
+			elif self.method=='confidence_only':
+				merit_function = self.confidence_only_merit
+			elif self.method=='full_confidence':
+				merit_function = self.full_confidence_merit
+			elif self.method=='binary_confidence_only':
+				merit_function = self.binary_confidence_only_merit
+			elif self.method=='full_binary_confidence':
+				merit_function = self.full_binary_confidence_merit
+			else:
+				raise ValueError('Unknown method {0}'.format(self.method))
 		self.__fit_internals__ = None
 		self._fit_output = minimizer(merit_function)
 		self.__fit_internals__ = None
@@ -1507,12 +1530,12 @@ _fit_output = {_fit_output}
 		self.high_confidence_mapping(parameters)
 		
 		Get the high confidence mapping as a function of time.
-		Returns a numpy array of shape (2,self.dp.nT)
+		Returns a numpy array of shape (2,self.dm.nT)
 		The output[0] is the mapping for hits and output[1] is the
 		mapping for misses.
 		
 		"""
-		return self.dp.confidence_mapping(parameters['high_confidence_threshold'],parameters['confidence_map_slope'],self.confidence_mapping_method)
+		return self.dm.confidence_mapping(parameters['high_confidence_threshold'],parameters['confidence_map_slope'],self.confidence_mapping_method)
 	
 	# Method dependent merits
 	def full_merit(self,x):
@@ -1534,18 +1557,18 @@ _fit_output = {_fit_output}
 		parameters = self.get_parameters_dict_from_array(x)
 		nlog_likelihood = 0.
 		if 'cost' in self.get_fitted_parameters() or 'internal_var' in self.get_fitted_parameters():
-			self.dp.set_cost(parameters['cost'])
-			self.dp.set_internal_var(parameters['internal_var'])
+			self.dm.set_cost(parameters['cost'])
+			self.dm.set_internal_var(parameters['internal_var'])
 			must_compute_first_passage_time = True
 			must_store_first_passage_time = False
-			xub,xlb = self.dp.xbounds()
+			xub,xlb = self.dm.xbounds()
 		else:
 			if self.__fit_internals__ is None:
 				must_compute_first_passage_time = True
 				must_store_first_passage_time = True
-				self.dp.set_cost(parameters['cost'])
-				self.dp.set_internal_var(parameters['internal_var'])
-				xub,xlb = self.dp.xbounds()
+				self.dm.set_cost(parameters['cost'])
+				self.dm.set_internal_var(parameters['internal_var'])
+				xub,xlb = self.dm.xbounds()
 				self.__fit_internals__ = {'xub':xub,'xlb':xlb,'first_passage_times':{}}
 			else:
 				must_compute_first_passage_time = False
@@ -1563,16 +1586,16 @@ _fit_output = {_fit_output}
 				except:
 					dead_time_convolver = self.get_dead_time_convolver(parameters)
 					self.__fit_internals__['dead_time_convolver'] = dead_time_convolver
-		if self.dp.known_variance():
+		if self.dm.known_variance():
 			for index,drift in enumerate(self.mu):
 				if must_compute_first_passage_time:
-					first_passage_time = np.array(self.dp.rt(drift,bounds=(xub,xlb)))
+					first_passage_time = np.array(self.dm.rt(drift,bounds=(xub,xlb)))
 					if must_store_first_passage_time:
 						self.__fit_internals__['first_passage_times'][drift] = first_passage_time
 				else:
 					first_passage_time = self.__fit_internals__['first_passage_times'][drift]
-				gs = self.dp.decision_pdf(first_passage_time,dead_time_convolver=dead_time_convolver)
-				t = np.arange(0,gs.shape[-1])*self.dp.dt
+				gs = self.dm.decision_pdf(first_passage_time,dead_time_convolver=dead_time_convolver)
+				t = np.arange(0,gs.shape[-1])*self.dm.dt
 				indeces = self.mu_indeces==index
 				for rt,perf in zip(self.rt[indeces],self.performance[indeces]):
 					nlog_likelihood-= np.log(rt_likelihood(t,gs[1-int(perf)],rt)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -1582,7 +1605,7 @@ _fit_output = {_fit_output}
 				external_var = stim[1]
 				total_var = external_var + parameters['internal_var']
 				if must_compute_first_passage_time:
-					first_passage_time = np.array(self.dp.rt(drift,total_var,bounds=(xub,xlb)))
+					first_passage_time = np.array(self.dm.rt(drift,total_var,bounds=(xub,xlb)))
 					if must_store_first_passage_time:
 						try:
 							self.__fit_internals__['first_passage_times'][drift][external_var] = first_passage_time
@@ -1591,8 +1614,8 @@ _fit_output = {_fit_output}
 							self.__fit_internals__['first_passage_times'][drift][external_var] = first_passage_time
 				else:
 					first_passage_time = self.__fit_internals__['first_passage_times'][drift][external_var]
-				gs = self.dp.decision_pdf(first_passage_time,dead_time_convolver=dead_time_convolver)
-				t = np.arange(0,gs.shape[-1])*self.dp.dt
+				gs = self.dm.decision_pdf(first_passage_time,dead_time_convolver=dead_time_convolver)
+				t = np.arange(0,gs.shape[-1])*self.dm.dt
 				indeces = self.stim_indeces==index
 				for rt,perf in zip(self.rt[indeces],self.performance[indeces]):
 					nlog_likelihood-= np.log(rt_likelihood(t,gs[1-int(perf)],rt)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -1616,9 +1639,9 @@ _fit_output = {_fit_output}
 		parameters = self.get_parameters_dict_from_array(x)
 		nlog_likelihood = 0.
 		if self.__fit_internals__ is None:
-			self.dp.set_cost(parameters['cost'])
-			self.dp.set_internal_var(parameters['internal_var'])
-			xub,xlb = self.dp.xbounds()
+			self.dm.set_cost(parameters['cost'])
+			self.dm.set_internal_var(parameters['internal_var'])
+			xub,xlb = self.dm.xbounds()
 			must_compute_first_passage_time = True
 			self.__fit_internals__ = {'xub':xub,'xlb':xlb,'first_passage_times':{}}
 		else:
@@ -1639,14 +1662,14 @@ _fit_output = {_fit_output}
 					dead_time_convolver = self.get_dead_time_convolver(parameters)
 					self.__fit_internals__['dead_time_convolver'] = dead_time_convolver
 		
-		if self.dp.known_variance():
+		if self.dm.known_variance():
 			for index,drift in enumerate(self.mu):
 				if must_compute_first_passage_time:
-					gs = np.array(self.dp.rt(drift,bounds=(xub,xlb)))
+					gs = np.array(self.dm.rt(drift,bounds=(xub,xlb)))
 					self.__fit_internals__['first_passage_times'][drift] = gs
 				else:
 					gs = self.__fit_internals__['first_passage_times'][drift]
-				conf_lik_pdf = np.sum(self.dp.rt_confidence_pdf(gs,mapped_confidences,dead_time_convolver),axis=2)
+				conf_lik_pdf = np.sum(self.dm.rt_confidence_pdf(gs,mapped_confidences,dead_time_convolver),axis=2)
 				indeces = self.mu_indeces==index
 				for perf,conf in zip(self.performance[indeces],self.confidence[indeces]):
 					nlog_likelihood-=np.log(confidence_likelihood(conf_lik_pdf[1-int(perf)],conf)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -1656,7 +1679,7 @@ _fit_output = {_fit_output}
 				external_var = stim[1]
 				total_var = external_var + parameters['internal_var']
 				if must_compute_first_passage_time:
-					gs = np.array(self.dp.rt(drift,total_var,bounds=(xub,xlb)))
+					gs = np.array(self.dm.rt(drift,total_var,bounds=(xub,xlb)))
 					try:
 						self.__fit_internals__['first_passage_times'][drift][external_var] = gs
 					except:
@@ -1664,7 +1687,7 @@ _fit_output = {_fit_output}
 						self.__fit_internals__['first_passage_times'][drift][external_var] = gs
 				else:
 					gs = self.__fit_internals__['first_passage_times'][drift][external_var]
-				conf_lik_pdf = np.sum(self.dp.rt_confidence_pdf(gs,confidence_response=mapped_confidences,dead_time_convolver=dead_time_convolver,confidence_partition=self.confidence_partition),axis=2)
+				conf_lik_pdf = np.sum(self.dm.rt_confidence_pdf(gs,confidence_response=mapped_confidences,dead_time_convolver=dead_time_convolver,confidence_partition=self.confidence_partition),axis=2)
 				indeces = self.stim_indeces==index
 				for perf,conf in zip(self.performance[indeces],self.confidence[indeces]):
 					nlog_likelihood-=np.log(confidence_likelihood(conf_lik_pdf[1-int(perf)],conf)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -1689,18 +1712,18 @@ _fit_output = {_fit_output}
 		parameters = self.get_parameters_dict_from_array(x)
 		nlog_likelihood = 0.
 		if 'cost' in self.get_fitted_parameters() or 'internal_var' in self.get_fitted_parameters():
-			self.dp.set_cost(parameters['cost'])
-			self.dp.set_internal_var(parameters['internal_var'])
+			self.dm.set_cost(parameters['cost'])
+			self.dm.set_internal_var(parameters['internal_var'])
 			must_compute_first_passage_time = True
 			must_store_first_passage_time = False
-			xub,xlb = self.dp.xbounds()
+			xub,xlb = self.dm.xbounds()
 		else:
 			if self.__fit_internals__ is None:
 				must_compute_first_passage_time = True
 				must_store_first_passage_time = True
-				self.dp.set_cost(parameters['cost'])
-				self.dp.set_internal_var(parameters['internal_var'])
-				xub,xlb = self.dp.xbounds()
+				self.dm.set_cost(parameters['cost'])
+				self.dm.set_internal_var(parameters['internal_var'])
+				xub,xlb = self.dm.xbounds()
 				self.__fit_internals__ = {'xub':xub,'xlb':xlb,'first_passage_times':{}}
 			else:
 				must_compute_first_passage_time = False
@@ -1719,16 +1742,16 @@ _fit_output = {_fit_output}
 				except:
 					dead_time_convolver = self.get_dead_time_convolver(parameters)
 					self.__fit_internals__['dead_time_convolver'] = dead_time_convolver
-		if self.dp.known_variance():
+		if self.dm.known_variance():
 			for index,drift in enumerate(self.mu):
 				if must_compute_first_passage_time:
-					gs = np.array(self.dp.rt(drift,bounds=(xub,xlb)))
+					gs = np.array(self.dm.rt(drift,bounds=(xub,xlb)))
 					if must_store_first_passage_time:
 						self.__fit_internals__['first_passage_times'][drift] = gs
 				else:
 					gs = self.__fit_internals__['first_passage_times'][drift]
-				rt_conf_lik_matrix = self.dp.rt_confidence_pdf(gs,confidence_response=mapped_confidences,dead_time_convolver=dead_time_convolver,confidence_partition=self.confidence_partition)
-				t = np.arange(0,rt_conf_lik_matrix.shape[-1])*self.dp.dt
+				rt_conf_lik_matrix = self.dm.rt_confidence_pdf(gs,confidence_response=mapped_confidences,dead_time_convolver=dead_time_convolver,confidence_partition=self.confidence_partition)
+				t = np.arange(0,rt_conf_lik_matrix.shape[-1])*self.dm.dt
 				indeces = self.mu_indeces==index
 				for rt,perf,conf in zip(self.rt[indeces],self.performance[indeces],self.confidence[indeces]):
 					nlog_likelihood-=np.log(rt_confidence_likelihood(t,rt_conf_lik_matrix[1-int(perf)],rt,conf)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -1738,7 +1761,7 @@ _fit_output = {_fit_output}
 				external_var = stim[1]
 				total_var = external_var + parameters['internal_var']
 				if must_compute_first_passage_time:
-					gs = np.array(self.dp.rt(drift,total_var,bounds=(xub,xlb)))
+					gs = np.array(self.dm.rt(drift,total_var,bounds=(xub,xlb)))
 					if must_store_first_passage_time:
 						try:
 							self.__fit_internals__['first_passage_times'][drift][external_var] = gs
@@ -1747,8 +1770,8 @@ _fit_output = {_fit_output}
 							self.__fit_internals__['first_passage_times'][drift][external_var] = gs
 				else:
 					gs = self.__fit_internals__['first_passage_times'][drift][external_var]
-				rt_conf_lik_matrix = self.dp.rt_confidence_pdf(gs,confidence_response=mapped_confidences,dead_time_convolver=dead_time_convolver,confidence_partition=self.confidence_partition)
-				t = np.arange(0,rt_conf_lik_matrix.shape[-1])*self.dp.dt
+				rt_conf_lik_matrix = self.dm.rt_confidence_pdf(gs,confidence_response=mapped_confidences,dead_time_convolver=dead_time_convolver,confidence_partition=self.confidence_partition)
+				t = np.arange(0,rt_conf_lik_matrix.shape[-1])*self.dm.dt
 				indeces = self.stim_indeces==index
 				for rt,perf,conf in zip(self.rt[indeces],self.performance[indeces],self.confidence[indeces]):
 					nlog_likelihood-=np.log(rt_confidence_likelihood(t,rt_conf_lik_matrix[1-int(perf)],rt,conf)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -1773,24 +1796,24 @@ _fit_output = {_fit_output}
 		parameters = self.get_parameters_dict_from_array(x)
 		nlog_likelihood = 0.
 		if 'cost' in self.get_fitted_parameters() or 'internal_var' in self.get_fitted_parameters():
-			self.dp.set_cost(parameters['cost'])
-			self.dp.set_internal_var(parameters['internal_var'])
+			self.dm.set_cost(parameters['cost'])
+			self.dm.set_internal_var(parameters['internal_var'])
 			must_compute_first_passage_time = True
 			must_store_first_passage_time = False
-			xub,xlb = self.dp.xbounds()
+			xub,xlb = self.dm.xbounds()
 		else:
 			if self.__fit_internals__ is None:
 				must_compute_first_passage_time = True
 				must_store_first_passage_time = True
-				self.dp.set_cost(parameters['cost'])
-				self.dp.set_internal_var(parameters['internal_var'])
-				xub,xlb = self.dp.xbounds()
+				self.dm.set_cost(parameters['cost'])
+				self.dm.set_internal_var(parameters['internal_var'])
+				xub,xlb = self.dm.xbounds()
 				self.__fit_internals__ = {'xub':xub,'xlb':xlb,'first_passage_times':{}}
 			else:
 				must_compute_first_passage_time = False
 				first_passage_times = self.__fit_internals__['first_passage_times']
 		random_rt_likelihood = 0.25*parameters['phase_out_prob']/(self.max_RT-self.min_RT)
-		mapped_confidences = self.dp.confidence_mapping(parameters['high_confidence_threshold'],np.inf,confidence_mapping_method=self.confidence_mapping_method)
+		mapped_confidences = self.dm.confidence_mapping(parameters['high_confidence_threshold'],np.inf,confidence_mapping_method=self.confidence_mapping_method)
 		if 'dead_time' in self.get_fitted_parameters() or 'dead_time_sigma' in self.get_fitted_parameters():
 			dead_time_convolver = self.get_dead_time_convolver(parameters)
 		else:
@@ -1812,16 +1835,16 @@ _fit_output = {_fit_output}
 			else:
 				self.__fit_internals__['binary_confidence'] = binary_confidence
 		
-		if self.dp.known_variance():
+		if self.dm.known_variance():
 			for index,drift in enumerate(self.mu):
 				if must_compute_first_passage_time:
-					gs = np.array(self.dp.rt(drift,bounds=(xub,xlb)))
+					gs = np.array(self.dm.rt(drift,bounds=(xub,xlb)))
 					if must_store_first_passage_time:
 						self.__fit_internals__['first_passage_times'][drift] = gs
 				else:
 					gs = self.__fit_internals__['first_passage_times'][drift]
-				binary_confidence_pdf = self.dp.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver=dead_time_convolver)
-				t = np.arange(0,binary_confidence_pdf.shape[-1])*self.dp.dt
+				binary_confidence_pdf = self.dm.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver=dead_time_convolver)
+				t = np.arange(0,binary_confidence_pdf.shape[-1])*self.dm.dt
 				indeces = self.mu_indeces==index
 				for rt,perf,binary_conf in zip(self.rt[indeces],self.performance[indeces],binary_confidence[indeces]):
 					nlog_likelihood-=np.log(rt_likelihood(t,binary_confidence_pdf[(1-int(perf)),binary_conf],rt)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -1831,7 +1854,7 @@ _fit_output = {_fit_output}
 				external_var = stim[1]
 				total_var = external_var + parameters['internal_var']
 				if must_compute_first_passage_time:
-					gs = np.array(self.dp.rt(drift,total_var,bounds=(xub,xlb)))
+					gs = np.array(self.dm.rt(drift,total_var,bounds=(xub,xlb)))
 					if must_store_first_passage_time:
 						try:
 							self.__fit_internals__['first_passage_times'][drift][external_var] = gs
@@ -1840,8 +1863,8 @@ _fit_output = {_fit_output}
 							self.__fit_internals__['first_passage_times'][drift][external_var] = gs
 				else:
 					gs = self.__fit_internals__['first_passage_times'][drift][external_var]
-				binary_confidence_pdf = self.dp.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver=dead_time_convolver)
-				t = np.arange(0,binary_confidence_pdf.shape[-1])*self.dp.dt
+				binary_confidence_pdf = self.dm.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver=dead_time_convolver)
+				t = np.arange(0,binary_confidence_pdf.shape[-1])*self.dm.dt
 				indeces = self.stim_indeces==index
 				for rt,perf,binary_conf in zip(self.rt[indeces],self.performance[indeces],binary_confidence[indeces]):
 					nlog_likelihood-=np.log(rt_likelihood(t,binary_confidence_pdf[(1-int(perf)),binary_conf],rt)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -1866,16 +1889,16 @@ _fit_output = {_fit_output}
 		parameters = self.get_parameters_dict_from_array(x)
 		nlog_likelihood = 0.
 		if self.__fit_internals__ is None:
-			self.dp.set_cost(parameters['cost'])
-			self.dp.set_internal_var(parameters['internal_var'])
-			xub,xlb = self.dp.xbounds()
+			self.dm.set_cost(parameters['cost'])
+			self.dm.set_internal_var(parameters['internal_var'])
+			xub,xlb = self.dm.xbounds()
 			must_compute_first_passage_time = True
 			self.__fit_internals__ = {'xub':xub,'xlb':xlb,'first_passage_times':{},'dead_time_convolver': self.get_dead_time_convolver(parameters)}
 		else:
 			must_compute_first_passage_time = False
 			first_passage_times = self.__fit_internals__['first_passage_times']
 		random_rt_likelihood = 0.5*parameters['phase_out_prob']
-		mapped_confidences = self.dp.confidence_mapping(parameters['high_confidence_threshold'],np.inf,confidence_mapping_method=self.confidence_mapping_method)
+		mapped_confidences = self.dm.confidence_mapping(parameters['high_confidence_threshold'],np.inf,confidence_mapping_method=self.confidence_mapping_method)
 		if 'dead_time' in self.get_fitted_parameters() or 'dead_time_sigma' in self.get_fitted_parameters():
 			dead_time_convolver = self.get_dead_time_convolver(parameters)
 		else:
@@ -1897,15 +1920,15 @@ _fit_output = {_fit_output}
 			else:
 				self.__fit_internals__['binary_confidence'] = binary_confidence
 		
-		if self.dp.known_variance():
+		if self.dm.known_variance():
 			for index,drift in enumerate(self.mu):
 				if must_compute_first_passage_time:
-					gs = np.array(self.dp.rt(drift,bounds=(xub,xlb)))
+					gs = np.array(self.dm.rt(drift,bounds=(xub,xlb)))
 					self.__fit_internals__['first_passage_times'][drift] = gs
 				else:
 					gs = self.__fit_internals__['first_passage_times'][drift]
-				binary_confidence_pdf = np.sum(self.dp.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver=dead_time_convolver),axis=0)
-				t = np.arange(0,binary_confidence_pdf.shape[-1])*self.dp.dt
+				binary_confidence_pdf = np.sum(self.dm.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver=dead_time_convolver),axis=0)
+				t = np.arange(0,binary_confidence_pdf.shape[-1])*self.dm.dt
 				indeces = self.mu_indeces==index
 				for rt,binary_conf in zip(self.rt[indeces],binary_confidence[indeces]):
 					nlog_likelihood-=np.log(rt_likelihood(t,binary_confidence_pdf[binary_conf],rt)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -1915,7 +1938,7 @@ _fit_output = {_fit_output}
 				external_var = stim[1]
 				total_var = external_var + parameters['internal_var']
 				if must_compute_first_passage_time:
-					gs = np.array(self.dp.rt(drift,total_var,bounds=(xub,xlb)))
+					gs = np.array(self.dm.rt(drift,total_var,bounds=(xub,xlb)))
 					try:
 						self.__fit_internals__['first_passage_times'][drift][external_var] = gs
 					except:
@@ -1923,8 +1946,8 @@ _fit_output = {_fit_output}
 						self.__fit_internals__['first_passage_times'][drift][external_var] = gs
 				else:
 					gs = self.__fit_internals__['first_passage_times'][drift][external_var]
-				binary_confidence_pdf = np.sum(self.dp.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver=dead_time_convolver),axis=0)
-				t = np.arange(0,binary_confidence_pdf.shape[-1])*self.dp.dt
+				binary_confidence_pdf = np.sum(self.dm.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver=dead_time_convolver),axis=0)
+				t = np.arange(0,binary_confidence_pdf.shape[-1])*self.dm.dt
 				indeces = self.stim_indeces==index
 				for rt,binary_conf in zip(self.rt[indeces],binary_confidence[indeces]):
 					nlog_likelihood-=np.log(rt_likelihood(t,binary_confidence_pdf[binary_conf],rt)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -1940,15 +1963,15 @@ _fit_output = {_fit_output}
 		
 		"""
 		nlog_likelihood = 0.
-		self.dp.set_cost(parameters['cost'])
-		self.dp.set_internal_var(parameters['internal_var'])
-		xub,xlb = self.dp.xbounds()
+		self.dm.set_cost(parameters['cost'])
+		self.dm.set_internal_var(parameters['internal_var'])
+		xub,xlb = self.dm.xbounds()
 		random_rt_likelihood = 0.5*parameters['phase_out_prob']/(self.max_RT-self.min_RT)
 		dead_time_convolver = self.get_dead_time_convolver(parameters)
-		if self.dp.known_variance():
+		if self.dm.known_variance():
 			for index,drift in enumerate(self.mu):
-				gs = self.dp.decision_pdf(np.array(self.dp.rt(drift,bounds=(xub,xlb))),parameters,dead_time_convolver=dead_time_convolver)
-				t = np.arange(0,gs.shape[-1])*self.dp.dt
+				gs = self.dm.decision_pdf(np.array(self.dm.rt(drift,bounds=(xub,xlb))),parameters,dead_time_convolver=dead_time_convolver)
+				t = np.arange(0,gs.shape[-1])*self.dm.dt
 				indeces = self.mu_indeces==index
 				for rt,perf in zip(self.rt[indeces],self.performance[indeces]):
 					nlog_likelihood-= np.log(rt_likelihood(t,gs[1-int(perf)],rt)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -1957,8 +1980,8 @@ _fit_output = {_fit_output}
 				drift = stim[0]
 				external_var = stim[1]
 				total_var = external_var + parameters['internal_var']
-				gs = self.dp.decision_pdf(np.array(self.dp.rt(drift,total_var,bounds=(xub,xlb))),dead_time_convolver=dead_time_convolver)
-				t = np.arange(0,gs.shape[-1])*self.dp.dt
+				gs = self.dm.decision_pdf(np.array(self.dm.rt(drift,total_var,bounds=(xub,xlb))),dead_time_convolver=dead_time_convolver)
+				t = np.arange(0,gs.shape[-1])*self.dm.dt
 				indeces = self.stim_indeces==index
 				for rt,perf in zip(self.rt[indeces],self.performance[indeces]):
 					nlog_likelihood-= np.log(rt_likelihood(t,gs[1-int(perf)],rt)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -1973,17 +1996,17 @@ _fit_output = {_fit_output}
 		
 		"""
 		nlog_likelihood = 0.
-		self.dp.set_cost(parameters['cost'])
-		self.dp.set_internal_var(parameters['internal_var'])
-		xub,xlb = self.dp.xbounds()
+		self.dm.set_cost(parameters['cost'])
+		self.dm.set_internal_var(parameters['internal_var'])
+		xub,xlb = self.dm.xbounds()
 		random_rt_likelihood = 0.5*parameters['phase_out_prob']/float(self.confidence_partition)
 		mapped_confidences = self.confidence_mapping(parameters)
 		dead_time_convolver = self.get_dead_time_convolver(parameters)
 		
-		if self.dp.known_variance():
+		if self.dm.known_variance():
 			for index,drift in enumerate(self.mu):
-				gs = np.array(self.dp.rt(drift,bounds=(xub,xlb)))
-				conf_lik_pdf = np.sum(self.dp.rt_confidence_pdf(gs,confidence_response=mapped_confidences,dead_time_convolver=dead_time_convolver,confidence_partition=self.confidence_partition),axis=2)
+				gs = np.array(self.dm.rt(drift,bounds=(xub,xlb)))
+				conf_lik_pdf = np.sum(self.dm.rt_confidence_pdf(gs,confidence_response=mapped_confidences,dead_time_convolver=dead_time_convolver,confidence_partition=self.confidence_partition),axis=2)
 				indeces = self.mu_indeces==index
 				for perf,conf in zip(self.performance[indeces],self.confidence[indeces]):
 					nlog_likelihood-=np.log(confidence_likelihood(conf_lik_pdf[1-int(perf)],conf)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -1992,8 +2015,8 @@ _fit_output = {_fit_output}
 				drift = stim[0]
 				external_var = stim[1]
 				total_var = external_var + parameters['internal_var']
-				gs = np.array(self.dp.rt(drift,total_var,bounds=(xub,xlb)))
-				conf_lik_pdf = np.sum(self.dp.rt_confidence_pdf(gs,confidence_response=mapped_confidences,dead_time_convolver=dead_time_convolver,confidence_partition=self.confidence_partition),axis=2)
+				gs = np.array(self.dm.rt(drift,total_var,bounds=(xub,xlb)))
+				conf_lik_pdf = np.sum(self.dm.rt_confidence_pdf(gs,confidence_response=mapped_confidences,dead_time_convolver=dead_time_convolver,confidence_partition=self.confidence_partition),axis=2)
 				indeces = self.stim_indeces==index
 				for perf,conf in zip(self.performance[indeces],self.confidence[indeces]):
 					nlog_likelihood-=np.log(confidence_likelihood(conf_lik_pdf[1-int(perf)],conf)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -2008,18 +2031,18 @@ _fit_output = {_fit_output}
 		
 		"""
 		nlog_likelihood = 0.
-		self.dp.set_cost(parameters['cost'])
-		self.dp.set_internal_var(parameters['internal_var'])
-		xub,xlb = self.dp.xbounds()
+		self.dm.set_cost(parameters['cost'])
+		self.dm.set_internal_var(parameters['internal_var'])
+		xub,xlb = self.dm.xbounds()
 		random_rt_likelihood = 0.5*parameters['phase_out_prob']/(self.max_RT-self.min_RT)/float(self.confidence_partition)
 		mapped_confidences = self.confidence_mapping(parameters)
 		dead_time_convolver = self.get_dead_time_convolver(parameters)
 		
-		if self.dp.known_variance():
+		if self.dm.known_variance():
 			for index,drift in enumerate(self.mu):
-				gs = np.array(self.dp.rt(drift,bounds=(xub,xlb)))
-				rt_conf_lik_matrix = self.dp.rt_confidence_pdf(gs,confidence_response=mapped_confidences,dead_time_convolver=dead_time_convolver,confidence_partition=self.confidence_partition)
-				t = np.arange(0,rt_conf_lik_matrix.shape[-1])*self.dp.dt
+				gs = np.array(self.dm.rt(drift,bounds=(xub,xlb)))
+				rt_conf_lik_matrix = self.dm.rt_confidence_pdf(gs,confidence_response=mapped_confidences,dead_time_convolver=dead_time_convolver,confidence_partition=self.confidence_partition)
+				t = np.arange(0,rt_conf_lik_matrix.shape[-1])*self.dm.dt
 				indeces = self.mu_indeces==index
 				for rt,perf,conf in zip(self.rt[indeces],self.performance[indeces],self.confidence[indeces]):
 					nlog_likelihood-=np.log(rt_confidence_likelihood(t,rt_conf_lik_matrix[1-int(perf)],rt,conf)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -2028,9 +2051,9 @@ _fit_output = {_fit_output}
 				drift = stim[0]
 				external_var = stim[1]
 				total_var = external_var + parameters['internal_var']
-				gs = np.array(self.dp.rt(drift,total_var,bounds=(xub,xlb)))
-				rt_conf_lik_matrix = self.dp.rt_confidence_pdf(gs,confidence_response=mapped_confidences,dead_time_convolver=dead_time_convolver,confidence_partition=self.confidence_partition)
-				t = np.arange(0,rt_conf_lik_matrix.shape[-1])*self.dp.dt
+				gs = np.array(self.dm.rt(drift,total_var,bounds=(xub,xlb)))
+				rt_conf_lik_matrix = self.dm.rt_confidence_pdf(gs,confidence_response=mapped_confidences,dead_time_convolver=dead_time_convolver,confidence_partition=self.confidence_partition)
+				t = np.arange(0,rt_conf_lik_matrix.shape[-1])*self.dm.dt
 				indeces = self.stim_indeces==index
 				for rt,perf,conf in zip(self.rt[indeces],self.performance[indeces],self.confidence[indeces]):
 					nlog_likelihood-=np.log(rt_confidence_likelihood(t,rt_conf_lik_matrix[1-int(perf)],rt,conf)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -2045,19 +2068,19 @@ _fit_output = {_fit_output}
 		
 		"""
 		nlog_likelihood = 0.
-		self.dp.set_cost(parameters['cost'])
-		self.dp.set_internal_var(parameters['internal_var'])
-		xub,xlb = self.dp.xbounds()
+		self.dm.set_cost(parameters['cost'])
+		self.dm.set_internal_var(parameters['internal_var'])
+		xub,xlb = self.dm.xbounds()
 		random_rt_likelihood = 0.25*parameters['phase_out_prob']/(self.max_RT-self.min_RT)
-		mapped_confidences = self.dp.confidence_mapping(parameters['high_confidence_threshold'],np.inf,confidence_mapping_method=self.confidence_mapping_method)
+		mapped_confidences = self.dm.confidence_mapping(parameters['high_confidence_threshold'],np.inf,confidence_mapping_method=self.confidence_mapping_method)
 		dead_time_convolver = self.get_dead_time_convolver(parameters)
 		binary_confidence = self.get_binary_confidence_reports()
 		
-		if self.dp.known_variance():
+		if self.dm.known_variance():
 			for index,drift in enumerate(self.mu):
-				gs = np.array(self.dp.rt(drift,bounds=(xub,xlb)))
-				binary_confidence_pdf = self.dp.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver=dead_time_convolver)
-				t = np.arange(0,binary_confidence_pdf.shape[-1])*self.dp.dt
+				gs = np.array(self.dm.rt(drift,bounds=(xub,xlb)))
+				binary_confidence_pdf = self.dm.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver=dead_time_convolver)
+				t = np.arange(0,binary_confidence_pdf.shape[-1])*self.dm.dt
 				indeces = self.mu_indeces==index
 				for rt,perf,binary_conf in zip(self.rt[indeces],self.performance[indeces],binary_confidence[indeces]):
 					nlog_likelihood-=np.log(rt_likelihood(t,binary_confidence_pdf[(1-int(perf)),binary_conf],rt)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -2066,9 +2089,9 @@ _fit_output = {_fit_output}
 				drift = stim[0]
 				external_var = stim[1]
 				total_var = external_var + parameters['internal_var']
-				gs = np.array(self.dp.rt(drift,total_var,bounds=(xub,xlb)))
-				binary_confidence_pdf = self.dp.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver=dead_time_convolver)
-				t = np.arange(0,binary_confidence_pdf.shape[-1])*self.dp.dt
+				gs = np.array(self.dm.rt(drift,total_var,bounds=(xub,xlb)))
+				binary_confidence_pdf = self.dm.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver=dead_time_convolver)
+				t = np.arange(0,binary_confidence_pdf.shape[-1])*self.dm.dt
 				indeces = self.stim_indeces==index
 				for rt,perf,binary_conf in zip(self.rt[indeces],self.performance[indeces],binary_confidence[indeces]):
 					nlog_likelihood-=np.log(rt_likelihood(t,binary_confidence_pdf[(1-int(perf)),binary_conf],rt)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -2083,19 +2106,19 @@ _fit_output = {_fit_output}
 		
 		"""
 		nlog_likelihood = 0.
-		self.dp.set_cost(parameters['cost'])
-		self.dp.set_internal_var(parameters['internal_var'])
-		xub,xlb = self.dp.xbounds()
+		self.dm.set_cost(parameters['cost'])
+		self.dm.set_internal_var(parameters['internal_var'])
+		xub,xlb = self.dm.xbounds()
 		dead_time_convolver = self.get_dead_time_convolver(parameters)
 		random_rt_likelihood = 0.5*parameters['phase_out_prob']
-		mapped_confidences = self.dp.confidence_mapping(parameters['high_confidence_threshold'],np.inf,confidence_mapping_method=self.confidence_mapping_method)
+		mapped_confidences = self.dm.confidence_mapping(parameters['high_confidence_threshold'],np.inf,confidence_mapping_method=self.confidence_mapping_method)
 		binary_confidence = self.get_binary_confidence_reports()
 		
-		if self.dp.known_variance():
+		if self.dm.known_variance():
 			for index,drift in enumerate(self.mu):
-				gs = np.array(self.dp.rt(drift,bounds=(xub,xlb)))
-				binary_confidence_pdf = np.sum(self.dp.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver=dead_time_convolver),axis=0)
-				t = np.arange(0,binary_confidence_pdf.shape[-1])*self.dp.dt
+				gs = np.array(self.dm.rt(drift,bounds=(xub,xlb)))
+				binary_confidence_pdf = np.sum(self.dm.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver=dead_time_convolver),axis=0)
+				t = np.arange(0,binary_confidence_pdf.shape[-1])*self.dm.dt
 				indeces = self.mu_indeces==index
 				for rt,binary_conf in zip(self.rt[indeces],binary_confidence[indeces]):
 					nlog_likelihood-=np.log(rt_likelihood(t,binary_confidence_pdf[binary_conf],rt)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -2104,9 +2127,9 @@ _fit_output = {_fit_output}
 				drift = stim[0]
 				external_var = stim[1]
 				total_var = external_var + parameters['internal_var']
-				gs = np.array(self.dp.rt(drift,total_var,bounds=(xub,xlb)))
-				binary_confidence_pdf = np.sum(self.dp.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver=dead_time_convolver),axis=0)
-				t = np.arange(0,binary_confidence_pdf.shape[-1])*self.dp.dt
+				gs = np.array(self.dm.rt(drift,total_var,bounds=(xub,xlb)))
+				binary_confidence_pdf = np.sum(self.dm.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver=dead_time_convolver),axis=0)
+				t = np.arange(0,binary_confidence_pdf.shape[-1])*self.dm.dt
 				indeces = self.stim_indeces==index
 				for rt,binary_conf in zip(self.rt[indeces],binary_confidence[indeces]):
 					nlog_likelihood-=np.log(rt_likelihood(t,binary_confidence_pdf[binary_conf],rt)*(1-parameters['phase_out_prob'])+random_rt_likelihood)
@@ -2140,23 +2163,23 @@ _fit_output = {_fit_output}
 			binary_confidence = self.method=='binary_confidence_only' or self.method=='full_binary_confidence'
 		parameters = self.get_parameters_dict_from_fit_output(fit_output)
 		
-		self.dp.set_cost(parameters['cost'])
-		self.dp.set_internal_var(parameters['internal_var'])
-		xub,xlb = self.dp.xbounds()
+		self.dm.set_cost(parameters['cost'])
+		self.dm.set_internal_var(parameters['internal_var'])
+		xub,xlb = self.dm.xbounds()
 		
 		if binary_confidence:
-			mapped_confidences = self.dp.confidence_mapping(parameters['high_confidence_threshold'],np.inf,confidence_mapping_method=self.confidence_mapping_method)
+			mapped_confidences = self.dm.confidence_mapping(parameters['high_confidence_threshold'],np.inf,confidence_mapping_method=self.confidence_mapping_method)
 		else:
-			mapped_confidences = self.dp.confidence_mapping(parameters['high_confidence_threshold'],parameters['confidence_map_slope'],confidence_mapping_method=self.confidence_mapping_method)
+			mapped_confidences = self.dm.confidence_mapping(parameters['high_confidence_threshold'],parameters['confidence_map_slope'],confidence_mapping_method=self.confidence_mapping_method)
 		dead_time_convolver = self.get_dead_time_convolver(parameters)
 		output = None
-		if self.dp.known_variance():
+		if self.dm.known_variance():
 			for index,drift in enumerate(self.mu):
-				gs = np.array(self.dp.rt(drift,bounds=(xub,xlb)))
+				gs = np.array(self.dm.rt(drift,bounds=(xub,xlb)))
 				if binary_confidence:
-					rt_conf_lik_matrix = self.dp.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver)
+					rt_conf_lik_matrix = self.dm.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver)
 				else:
-					rt_conf_lik_matrix = self.dp.rt_confidence_pdf(gs,mapped_confidences,dead_time_convolver)
+					rt_conf_lik_matrix = self.dm.rt_confidence_pdf(gs,mapped_confidences,dead_time_convolver)
 				
 				if output is None:
 					output = rt_conf_lik_matrix*self.mu_prob[index]
@@ -2167,20 +2190,20 @@ _fit_output = {_fit_output}
 				drift = stim[0]
 				total_var = stim[1] + parameters['internal_var']
 				stim_prob = self.stim_prob[index]
-				gs = np.array(self.dp.rt(drift,total_var,bounds=(xub,xlb)))
+				gs = np.array(self.dm.rt(drift,total_var,bounds=(xub,xlb)))
 				if binary_confidence:
-					rt_conf_lik_matrix = self.dp.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver)
+					rt_conf_lik_matrix = self.dm.binary_confidence_pdf(gs,mapped_confidences,dead_time_convolver)
 				else:
-					rt_conf_lik_matrix = self.dp.rt_confidence_pdf(gs,mapped_confidences,dead_time_convolver)
+					rt_conf_lik_matrix = self.dm.rt_confidence_pdf(gs,mapped_confidences,dead_time_convolver)
 				if output is None:
 					output = rt_conf_lik_matrix*stim_prob
 				else:
 					output+= rt_conf_lik_matrix*stim_prob
-		output/=(np.sum(output)*self.dp.dt)
-		t = np.arange(0,output.shape[2],dtype=np.float)*self.dp.dt
+		output/=(np.sum(output)*self.dm.dt)
+		t = np.arange(0,output.shape[2],dtype=np.float)*self.dm.dt
 		random_rt_likelihood = np.ones_like(output)
 		random_rt_likelihood[:,:,np.logical_or(t<self.min_RT,t>self.max_RT)] = 0.
-		random_rt_likelihood/=(np.sum(random_rt_likelihood)*self.dp.dt)
+		random_rt_likelihood/=(np.sum(random_rt_likelihood)*self.dm.dt)
 		return output*(1.-parameters['phase_out_prob'])+parameters['phase_out_prob']*random_rt_likelihood, t
 	
 	# Plotter
@@ -2303,7 +2326,7 @@ _fit_output = {_fit_output}
 		"""
 		pdf,t = self.theoretical_rt_confidence_distribution(fit_output=fit_output)
 		binary_confidence = self.method=='binary_confidence_only' or self.method=='full_binary_confidence'
-		dt = self.dp.dt
+		dt = self.dm.dt
 		valid = t<=self._time_available_to_respond
 		if not all(valid):
 			t = t[valid]
