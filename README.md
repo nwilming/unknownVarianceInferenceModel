@@ -28,6 +28,7 @@ In order to be able to perform fits you must read through fits_module.py's comma
 
 The required file structure is as follows:
 
+```
 .
 +--raw_data_dir:
 |   +--Experiment1Name:
@@ -36,6 +37,7 @@ The required file structure is as follows:
 |   +--Experiment2Name:
 |         +-- Subject1Name: Raw subject1 experiment2 data for all sessions
 |         +-- Subject2Name: Raw subject2 experiment2 data for all sessions
+```
 
 IMPORTANT! The sessions must be clearly identifiable from the data file name.
 
