@@ -28,17 +28,18 @@ In order to be able to perform fits you must read through fits_module.py's comma
 
 The required file structure is as follows:
 raw_data_dir:
-|---Experiment1Name:
-|        |--- Subject1Name: Raw subject1 experiment1 data for all sessions
-|        |--- Subject1Name: Raw subject2 experiment1 data for all sessions
-|---Experiment2Name:
-         |--- Subject1Name: Raw subject1 experiment2 data for all sessions
-         |--- Subject2Name: Raw subject2 experiment2 data for all sessions
++--Experiment1Name:
+|        +-- Subject1Name: Raw subject1 experiment1 data for all sessions
+|        +-- Subject1Name: Raw subject2 experiment1 data for all sessions
++--Experiment2Name:
+         +-- Subject1Name: Raw subject1 experiment2 data for all sessions
+         +-- Subject2Name: Raw subject2 experiment2 data for all sessions
 
 IMPORTANT! The sessions must be clearly identifiable from the data file name.
 
 The experiment_details.txt specifies the raw_data_dir's full path and the handled experiment names with their properties. It must have a structure as shown below:
-----------
+
+```
 \# Comments can be placed with the # character before
 raw_data_dir: raw_data_dir/
 
@@ -77,3 +78,4 @@ begin experiment TestExperimentName
 	\#				 will extract the field name data from the loaded
 	\#				 raw data
 end experiment TestExperimentName
+```
