@@ -27,13 +27,15 @@ This repo has 3 scripts that are the ones intended to be used:
 In order to be able to perform fits you must read through fits_module.py's command line help, but more importantly, must write a proper experiment_details.txt file and place the experimental data in a certain file structure.
 
 The required file structure is as follows:
-raw_data_dir:
-+--Experiment1Name:
+
+.
++--raw_data_dir:
+|   +--Experiment1Name:
 |        +-- Subject1Name: Raw subject1 experiment1 data for all sessions
 |        +-- Subject1Name: Raw subject2 experiment1 data for all sessions
-+--Experiment2Name:
-         +-- Subject1Name: Raw subject1 experiment2 data for all sessions
-         +-- Subject2Name: Raw subject2 experiment2 data for all sessions
+|   +--Experiment2Name:
+|         +-- Subject1Name: Raw subject1 experiment2 data for all sessions
+|         +-- Subject2Name: Raw subject2 experiment2 data for all sessions
 
 IMPORTANT! The sessions must be clearly identifiable from the data file name.
 
