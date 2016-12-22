@@ -469,7 +469,7 @@ bounds = {bounds}
 		Input:
 			first_passage_time: First passage time probability density.
 				A numpy array of shape (2,self.nT) that can be the
-				result of np.array(cost_time.DecisionModel.rt())
+				result of np.array(cost_time.DecisionModel.fpt())
 			confidence_response: The output from self.confidence_mapping(...)
 			dead_time_convolver: The output from self.get_dead_time_convolver(...)
 			confidence_partition: An int that is passed to fpt_conf_matrix
@@ -507,7 +507,7 @@ bounds = {bounds}
 		Input:
 			first_passage_pdfs: First passage probability density. A numpy
 				array of shape (2,self.nT) that can be the output of
-				np.array(self.rt(...))
+				np.array(self.fpt(...))
 			dead_time_convolver: The output from
 				self.get_dead_time_convolver(...)
 		
@@ -539,7 +539,7 @@ bounds = {bounds}
 		Input:
 			first_passage_pdfs: First passage probability density. A numpy
 				array of shape (2,self.nT) that can be the output of
-				np.array(self.rt(...))
+				np.array(self.fpt(...))
 			confidence_response: The output from self.confidence_mapping(...)
 			dead_time_convolver: The output from self.get_dead_time_convolver(...)
 		
@@ -949,13 +949,13 @@ def _test():
 	print('Computing rt')
 	print('Conj')
 	mu = 1.
-	rt1 = np.array(d1.rt(mu,bounds=(xub1,xlb1)))
+	rt1 = np.array(d1.fpt(mu,bounds=(xub1,xlb1)))
 	print('Discrete mu')
-	rt2 = np.array(d2.rt(mu,bounds=(xub2,xlb2)))
+	rt2 = np.array(d2.fpt(mu,bounds=(xub2,xlb2)))
 	rt3 = np.zeros_like(rt1)
 	for model_var,prior_var_prob in zip(d3.model_var,d3.prior_var_prob):
 		print('Discrete var: {0}'.format(model_var))
-		rt3+= np.array(d3.rt(mu,bounds=(xub1,xlb1),model_var=model_var))*prior_var_prob
+		rt3+= np.array(d3.fpt(mu,bounds=(xub1,xlb1),model_var=model_var))*prior_var_prob
 	plt.figure()
 	plt.plot(d1.t,rt1[0],'b',label='Conj hit')
 	plt.plot(d1.t,rt1[1],'--b',label='Conj miss')
