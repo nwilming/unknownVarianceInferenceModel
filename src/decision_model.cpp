@@ -1,4 +1,4 @@
-#include "DecisionModel.hpp"
+#include "decision_model.hpp"
 /***
 C++ implementation of the value dynamic programming algorithm and
 first passage time probability density computations
@@ -548,9 +548,9 @@ double DecisionModel::Psi(double mu, double model_var, double* bound, int itp, d
 	return 0.5*normpdf*(bound_prime-(bound[itp]-x0)/(tp-t0));
 }
 
-void DecisionModel::rt(double mu, double model_var, double* g1, double* g2, double* xub, double* xlb){
+void DecisionModel::fpt(double mu, double model_var, double* g1, double* g2, double* xub, double* xlb){
 	#ifdef DEBUG
-	std::cout<<"Entered rt"<<std::endl;
+	std::cout<<"Entered fpt"<<std::endl;
 	#endif
 	unsigned int i,j;
 	unsigned int tnT = this->nT;

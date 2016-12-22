@@ -169,7 +169,7 @@ public:
 	double* x_lbound();
 	void x_lbound(double* xb);
 	double Psi(double mu, double model_var, double* bound, int itp, double tp, double x0, double t0);
-	void rt(double mu, double model_var, double* g1, double* g2, double* xub, double* xlb);
+	void fpt(double mu, double model_var, double* g1, double* g2, double* xub, double* xlb);
 	void fpt_conf_matrix(double* first_passage_time, int* first_passage_time_strides, int n_alternatives, int confidence_partition, double* confidence_response, int* confidence_response_strides, double* out);
 };
 

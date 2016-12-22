@@ -23,9 +23,9 @@ from scipy import optimize
 import math, copy, sys, warnings
 from utils import normcdf,normcdfinv,normpdf,average_downsample
 try:
-	import dp
+	import cdm
 except Exception:
-	print("cost_time.py requires the c++ compiled extension lib dp.so available")
+	print("cost_time.py requires the c++ compiled extension lib cdm.so available")
 	raise
 
 class DecisionModel():
@@ -439,24 +439,24 @@ bounds = {bounds}
 			return it.operands[2]
 	
 	def xbounds(self, tolerance=1e-12, set_rho=True, set_bounds=True, return_values=False, root_bounds=None):
-		return dp.xbounds(self,tolerance=tolerance, set_rho=set_rho, set_bounds=set_bounds, return_values=return_values, root_bounds=root_bounds)
-	xbounds.__doc__ = dp.xbounds.__doc__
+		return cdm.xbounds(self,tolerance=tolerance, set_rho=set_rho, set_bounds=set_bounds, return_values=return_values, root_bounds=root_bounds)
+	xbounds.__doc__ = cdm.xbounds.__doc__
 	
 	def xbounds_fixed_rho(self, rho=None, set_bounds=False, return_values=False):
-		return dp.xbounds_fixed_rho(self,rho=rho, set_bounds=set_bounds, return_values=return_values)
-	xbounds_fixed_rho.__doc__ = dp.xbounds_fixed_rho.__doc__
+		return cdm.xbounds_fixed_rho(self,rho=rho, set_bounds=set_bounds, return_values=return_values)
+	xbounds_fixed_rho.__doc__ = cdm.xbounds_fixed_rho.__doc__
 	
 	def values(self, rho=None):
-		return dp.values(self,rho=rho)
-	values.__doc__ = dp.values.__doc__
+		return cdm.values(self,rho=rho)
+	values.__doc__ = cdm.values.__doc__
 	
-	def rt(self,mu,model_var=None,bounds=None):
-		return dp.rt(self,mu,model_var=model_var,bounds=bounds)
-	rt.__doc__ = dp.rt.__doc__
+	def fpt(self,mu,model_var=None,bounds=None):
+		return cdm.fpt(self,mu,model_var=model_var,bounds=bounds)
+	fpt.__doc__ = cdm.fpt.__doc__
 	
 	def fpt_conf_matrix(self,first_passage_time, confidence_response, confidence_partition=100):
-		return dp.fpt_conf_matrix(self,first_passage_time, confidence_response, confidence_partition=confidence_partition)
-	fpt_conf_matrix.__doc__ = dp.fpt_conf_matrix.__doc__
+		return cdm.fpt_conf_matrix(self,first_passage_time, confidence_response, confidence_partition=confidence_partition)
+	fpt_conf_matrix.__doc__ = cdm.fpt_conf_matrix.__doc__
 	
 	def rt_confidence_pdf(self,first_passage_time, confidence_response, dead_time_convolver, confidence_partition=100):
 		"""
@@ -496,9 +496,9 @@ bounds = {bounds}
 		out/=(np.sum(out)*self.dt)
 		return out
 	
-	def decision_pdf(self,first_passage_pdfs,dead_time_convolver):
+	def rt_pdf(self,first_passage_pdfs,dead_time_convolver):
 		"""
-		self.decision_pdf(first_passage_pdfs,dead_time_convolver)
+		self.rt_pdf(first_passage_pdfs,dead_time_convolver)
 		
 		This method computes the joint probability of a given response time
 		and performance for the supplied model parameters and the
@@ -528,9 +528,9 @@ bounds = {bounds}
 		decision_pdfs/=(np.sum(decision_pdfs)*self.dt)
 		return decision_pdfs
 	
-	def binary_confidence_pdf(self,first_passage_pdfs,confidence_response,dead_time_convolver):
+	def binary_confidence_rt_pdf(self,first_passage_pdfs,confidence_response,dead_time_convolver):
 		"""
-		self.binary_confidence_pdf(first_passage_pdfs,confidence_response,dead_time_convolver)
+		self.binary_confidence_rt_pdf(first_passage_pdfs,confidence_response,dead_time_convolver)
 		
 		This method computes the joint probability of a given response time,
 		binary confidence and performance for the supplied model parameters and
@@ -862,7 +862,7 @@ def sim_rt(mu,var_rate,dt,T,xb,reps=10000):
 	return out
 
 def _test():
-	out = dp.testsuite()
+	out = cdm.testsuite()
 	dict1,dict2,dict3,t,cx,cg1,cg2,cg3,cdg1,cdg2,cdg3,cx1,cx2,cx3 = out
 	dict1['T'] = dict2['T'] = dict3['T'] = 3.
 	d1 = DecisionModel(**dict1)

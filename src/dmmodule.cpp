@@ -239,7 +239,7 @@ DecisionModelDescriptor* get_descriptor(PyObject* py_dp){
 }
 
 /* method xbounds(DecisionModel, tolerance=1e-12, set_rho=True, set_bounds=True, return_values=False, root_bounds=None) */
-static PyObject* dpmod_xbounds(PyObject* self, PyObject* args, PyObject* keywds){
+static PyObject* dmmod_xbounds(PyObject* self, PyObject* args, PyObject* keywds){
 	double tolerance = 1e-12;
 	PyObject* py_dp;
 	PyObject* py_set_rho_in_py_dp = Py_True;
@@ -433,7 +433,7 @@ error_cleanup:
 }
 
 /* method xbounds_fixed_rho(DecisionModel, rho=None, set_bounds=False, return_values=False) */
-static PyObject* dpmod_xbounds_fixed_rho(PyObject* self, PyObject* args, PyObject* keywds){
+static PyObject* dmmod_xbounds_fixed_rho(PyObject* self, PyObject* args, PyObject* keywds){
 	PyObject* py_dp;
 	PyObject* py_touch_py_bounds = Py_False;
 	PyObject* py_ret_values = Py_False;
@@ -608,7 +608,7 @@ error_cleanup:
 }
 
 /* method values(DecisionModel, rho=None) */
-static PyObject* dpmod_values(PyObject* self, PyObject* args, PyObject* keywds){
+static PyObject* dmmod_values(PyObject* self, PyObject* args, PyObject* keywds){
 	PyObject* py_dp;
 	PyObject* py_rho = Py_None;
 	double rho;
@@ -689,8 +689,8 @@ error_cleanup:
 	return NULL;
 }
 
-/* method rt(DecisionModel, mu, bounds=None) */
-static PyObject* dpmod_rt(PyObject* self, PyObject* args, PyObject* keywds){
+/* method fpt(DecisionModel, mu, bounds=None) */
+static PyObject* dmmod_fpt(PyObject* self, PyObject* args, PyObject* keywds){
 	PyObject* py_dp;
 	PyObject* py_bounds = Py_None;
 	PyObject* py_model_var = Py_None;
@@ -743,7 +743,7 @@ static PyObject* dpmod_rt(PyObject* self, PyObject* args, PyObject* keywds){
 	
 	if (py_bounds==Py_None) { // Compute xbounds if they are not provided
 		PyObject* args2 = PyTuple_Pack(1,py_dp);
-		py_bounds = dpmod_xbounds(self,args2,NULL);
+		py_bounds = dmmod_xbounds(self,args2,NULL);
 		Py_DECREF(args2);
 		if (py_bounds==NULL){
 			return NULL;
@@ -773,7 +773,7 @@ static PyObject* dpmod_rt(PyObject* self, PyObject* args, PyObject* keywds){
 	PyTuple_SET_ITEM(py_out, 0, py_g1); // Steals a reference
 	PyTuple_SET_ITEM(py_out, 1, py_g2); // Steals a reference
 		
-	dp->rt(mu,model_var,(double*) PyArray_DATA((PyArrayObject*) py_g1),
+	dp->fpt(mu,model_var,(double*) PyArray_DATA((PyArrayObject*) py_g1),
 			 (double*) PyArray_DATA((PyArrayObject*) py_g2),
 			 (double*) PyArray_DATA((PyArrayObject*) py_xub),
 			 (double*) PyArray_DATA((PyArrayObject*) py_xlb));
@@ -804,8 +804,8 @@ early_error_cleanup:
 	return NULL;
 }
 
-/* method rt(DecisionModel, mu, bounds=None) */
-static PyObject* dpmod_fpt_conf_matrix(PyObject* self, PyObject* args, PyObject* keywds){
+/* method fpt_conf_matrix(DecisionModel, mu, bounds=None) */
+static PyObject* dmmod_fpt_conf_matrix(PyObject* self, PyObject* args, PyObject* keywds){
 	/***
 	* This method takes the confidence report as a function of time (CR)
 	* and converts it to a matrix. This matrix is filled with zeroes
@@ -906,7 +906,7 @@ static PyObject* dpmod_fpt_conf_matrix(PyObject* self, PyObject* args, PyObject*
 	return PyArray_SwapAxes((PyArrayObject*) py_out, 1, 2);
 }
 
-static PyObject* dpmod_testsuite(PyObject* self, PyObject* args, PyObject* keywds){
+static PyObject* dmmod_testsuite(PyObject* self, PyObject* args, PyObject* keywds){
 	if (!PyArg_ParseTuple(args, ""))
 		return NULL;
 	
@@ -1071,42 +1071,42 @@ static PyObject* dpmod_testsuite(PyObject* self, PyObject* args, PyObject* keywd
 	return Py_BuildValue("(OOOOOOOOOOOOOO)", dict1, dict2, dict3, PyFloat_FromDouble(t), py_x, py_g1, py_g2, py_g3, py_dg1, py_dg2, py_dg3, py_x1, py_x2, py_x3);
 }
 
-static PyMethodDef DPMethods[] = {
-    {"xbounds", (PyCFunction) dpmod_xbounds, METH_VARARGS | METH_KEYWORDS,
+static PyMethodDef CDMMethods[] = {
+    {"xbounds", (PyCFunction) dmmod_xbounds, METH_VARARGS | METH_KEYWORDS,
      "Computes the decision bounds in x(t) space (i.e. the accumulated sensory input space)\n\n  (xub, xlb) = xbounds(dp, tolerance=1e-12, set_rho=False, set_bounds=False, return_values=False, root_bounds=None)\n\n(xub, xlb, value, v_explore, v1, v2) = xbounds(dp, ..., return_values=True)\n\nComputes the decision bounds for a DecisionModel instance specified in 'dp'.\nThis function is more memory and computationally efficient than calling dp.invert_belief();dp.value_dp(); xb = dp.belief_bound_to_x_bound(b); from python. Another difference is that this function returns a tuple of (upper_bound, lower_bound) instead of a numpy array whose first element is upper_bound and second element is lower_bound.\n'tolerance' is a float that indicates the tolerance when searching for the rho value that yields value[int(n/2)]=0.\n'set_rho' must be an expression whose 'truthness' can be evaluated. If set_rho is True, the rho attribute in the python dp object will be set to the rho value obtained after iteration. If false, it will not be set.\n'set_bounds' must be an expression whose 'truthness' can be evaluated. If set_bounds is True, the python DecisionModel object's ´bounds´ attribute will be set to the upper and lower bounds in g space computed in the c++ instance. If false, it will do nothing.\nIf 'return_values' evaluates to True, then the function returns four extra numpy arrays: value, v_explore, v1 and v2. 'value' is an nT by n shaped array that holds the value of a given g at time t. 'v_explore' has shape nT-1 by n and holds the value of exploring at time t with a given g. v1 and v2 are values of immediately deciding for option 1 or 2, and are one dimensional arrays with n elements.\n'root_bounds' must be a tuple of two elements: (lower_bound, upper_bound). Both 'lower_bound' and 'upper_bound' must be floats that represent the lower and upper bounds in which to perform the root finding of rho.\n\n"},
-    {"xbounds_fixed_rho", (PyCFunction) dpmod_xbounds_fixed_rho, METH_VARARGS | METH_KEYWORDS,
+    {"xbounds_fixed_rho", (PyCFunction) dmmod_xbounds_fixed_rho, METH_VARARGS | METH_KEYWORDS,
      "Computes the decision bounds in x(t) space (i.e. the accumulated sensory input space) without iterating the value of rho\n\n  (xub, xlb) = xbounds_fixed_rho(dp, rho=None, set_bounds=False, return_values=False)\n\n(xub, xlb, value, v_explore, v1, v2) = xbounds_fixed_rho(dp, ..., return_values=True)\n\nComputes the decision bounds for a DecisionModel instance specified in 'dp' for a given rho value.\nThis function is more memory and computationally efficient than calling dp.invert_belief();dp.value_dp(); xb = dp.belief_bound_to_x_bound(b); from python. Another difference is that this function returns a tuple of (upper_bound, lower_bound) instead of a numpy array whose first element is upper_bound and second element is lower_bound.\n'rho' is the fixed reward rate value used to compute the decision bounds and values. If rho=None, then the DecisionModel instance's rho is used.\n'set_bounds' must be an expression whose 'truthness' can be evaluated. If set_bounds is True, the python DecisionModel object's ´bounds´ attribute will be set to the upper and lower bounds in g space computed in the c++ instance. If false, it will do nothing.\nIf 'return_values' evaluates to True, then the function returns four extra numpy arrays: value, v_explore, v1 and v2. 'value' is an nT by n shaped array that holds the value of a given g at time t. 'v_explore' has shape nT-1 by n and holds the value of exploring at time t with a given g. v1 and v2 are values of immediately deciding for option 1 or 2, and are one dimensional arrays with n elements.\n\n"},
-    {"values", (PyCFunction) dpmod_values, METH_VARARGS | METH_KEYWORDS,
+    {"values", (PyCFunction) dmmod_values, METH_VARARGS | METH_KEYWORDS,
      "Computes the values for a given reward rate, rho, and DecisionModel parameters.\n\n(value, v_explore, v1, v2) = values(dp,rho=None)\n\nComputes the value for a given belief g as a function of time for a supplied reward rate, rho. If rho is set to None, then the DecisionModel instance's rho attribute will be used.\nThis function is more memory and computationally efficient than calling dp.invert_belief();dp.value_dp(); from python. The function returns a tuple of four numpy arrays: value, v_explore, v1 and v2. 'value' is an nT by n shaped array that holds the value of a given g at time t. 'v_explore' has shape nT-1 by n and holds the value of exploring at time t with a given g. v1 and v2 are values of immediately deciding for option 1 or 2, and are one dimensional arrays with n elements.\n"},
-    {"rt", (PyCFunction) dpmod_rt, METH_VARARGS | METH_KEYWORDS,
-     "Computes the rt distribution for a given drift rate, mu, variance rate, DecisionModel parameters and decision bounds in x space, bounds.\n\n(g1, g2) = values(dp,mu,model_var=None,bounds=None)\n\nInput:\n  dp:        DecisionModel instace\n  mu:        Float that encodes the diffusion drift rate (net evidence).\n  bounds:    By default None. If None, the method internally calls the function xbounds(dp) with default parameter values to compute the decision bounds in x space. To avoid this, supply a tuple (xub,xlb) as the one that is returned by the function xbounds. xub and xlb must be one dimensional numpy arrays with the same elements as dp.t.\n  model_var: An input that is mandatory for DecisionModel instances with unknown variance that represents the variance rate of the diffusion process. If the DecisionModel instance has known variance and model_var is None, the instance's model_var is used as the diffusion's variance rate.\n\nOutput:\n  (g1,g2):   Each of these outputs are 1D numpy arrays with dp.nT number of elements representing the first passage time probability density for option 1 and 2 respectively.\n\n"},
-    {"fpt_conf_matrix", (PyCFunction) dpmod_fpt_conf_matrix, METH_VARARGS | METH_KEYWORDS,
+    {"fpt", (PyCFunction) dmmod_fpt, METH_VARARGS | METH_KEYWORDS,
+     "Computes the first passage time distribution for a given drift rate, mu, variance rate, DecisionModel parameters and decision bounds in x space, bounds.\n\n(g1, g2) = values(dp,mu,model_var=None,bounds=None)\n\nInput:\n  dp:        DecisionModel instace\n  mu:        Float that encodes the diffusion drift rate (net evidence).\n  bounds:    By default None. If None, the method internally calls the function xbounds(dp) with default parameter values to compute the decision bounds in x space. To avoid this, supply a tuple (xub,xlb) as the one that is returned by the function xbounds. xub and xlb must be one dimensional numpy arrays with the same elements as dp.t.\n  model_var: An input that is mandatory for DecisionModel instances with unknown variance that represents the variance rate of the diffusion process. If the DecisionModel instance has known variance and model_var is None, the instance's model_var is used as the diffusion's variance rate.\n\nOutput:\n  (g1,g2):   Each of these outputs are 1D numpy arrays with dp.nT number of elements representing the first passage time probability density for option 1 and 2 respectively.\n\n"},
+    {"fpt_conf_matrix", (PyCFunction) dmmod_fpt_conf_matrix, METH_VARARGS | METH_KEYWORDS,
      "This method takes the confidence report as a function of time (CR)\nand converts it to a matrix. This matrix is filled with zeroes\nexcept for the entries that are touched by the plot of CR. The\nvalue of each entry is given by the first passage time probability\ndensity (FPT).\n\n\nfpt_conf_matrix(self,first_passage_time, confidence_response, confidence_partition=100)\n\nInput:\n	first_passage_time: A 2D numpy array of doubles with the FPT.\n		Axis=0 represents different responses and axis=1 time. The\n		shape of axis=1 must be equal to self.nT.\n	confidence_response: A 2D numpy array of doubles with the CR.\n		It must have the same shape as the first_passage_time input.\n	confidence_partition: An int that determines the number of\n		discrete confidence report values, uniformly distributed in\n		the interval [0,1], that will be used to construct the\n		output array.\n\nOutput: A 3D numpy array of shape:\n	(first_passage_time.shape[0],confidence_partition,first_passage_time.shape[1])\n	The values are such that np.sum(output,axis=1)==first_passage_time\n	and calling imshow(output[0]>0,origin='lower') and\n	plot(confidence_partition) will show almost overlapping curves.\n\n"},
-    {"testsuite", (PyCFunction) dpmod_testsuite, METH_VARARGS,""},
+    {"testsuite", (PyCFunction) dmmod_testsuite, METH_VARARGS,""},
     {NULL, NULL, 0, NULL}
 };
 
 #if PY_MAJOR_VERSION >= 3
     /* module initialisation for Python 3 */
-    static struct PyModuleDef dpmodule = {
+    static struct PyModuleDef cdmmodule = {
        PyModuleDef_HEAD_INIT,
-       "dp",   /* name of module */
+       "cdm",   /* name of module */
        "Module to compute the decision bounds and values for bayesian inference",
        -1,
-       DPMethods
+       CDMMethods
     };
 
-    PyMODINIT_FUNC PyInit_dp(void)
+    PyMODINIT_FUNC PyInit_cdm(void)
     {
-        PyObject *m = PyModule_Create(&dpmodule);
+        PyObject *m = PyModule_Create(&cdmmodule);
         import_array();
         return m;
     }
 #else
     /* module initialisation for Python 2 */
-    PyMODINIT_FUNC initdp(void)
+    PyMODINIT_FUNC initcdm(void)
     {
-        Py_InitModule("dp", DPMethods);
+        Py_InitModule("cdm", CDMMethods);
         import_array();
     }
 #endif
