@@ -23,7 +23,7 @@ parsed_details_file = parse_details_file()
 raw_data_dir = parsed_details_file['raw_data_dir']
 
 class SubjectSession:
-	def __init__(self,experiment,data_dir,name=None,session=None):
+	def __init__(self,session,experiment,data_dir,name=None):
 		"""
 		SubjectSession(self,session,experiment,data_dir,name=None)
 		
