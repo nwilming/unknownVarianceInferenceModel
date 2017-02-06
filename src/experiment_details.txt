@@ -1,10 +1,10 @@
-raw_data_dir: raw_data_dir/
+ raw_data_dir: raw_data_dir/
 
-begin experiment TestExperimentName
+begin experiment ConfExp
 	#----- DecisionModel keys -----#
 	tp: 0.
 	T: 5.
-	iti: 3. 
+	iti: 3.
 	dt: 1e-3
 	reward: 1
 	penalty: 0
@@ -20,106 +20,20 @@ begin experiment TestExperimentName
 	rt_cutoff: 14.
 	distractor: 0.
 	forced_non_decision_time: 0.
-	rt_measured_from_stim_end: False # If False, rt are measured from stim start. If True, they are measured from the stim end
+	rt_measured_from_stim_end: True # If False, rt are measured from stim start. If True, they are measured from the stim end
 	time_available_to_respond: inf
 	is_binary_confidence: True # Can be True or False to indicate if the confidence data is binary or not
 	#----- IO keys -----#
-	# session_parser: A lambda expression or callable that is able to parse the session number from the data filename
-	# file_extension: A str with the data file extension
-	# time_conversion_to_seconds: A float that will be multiplied to the RT data to convert the units to seconds
-	# data_structure: A json structure with fields "delimiter" and "data_fields"
-	#				 "data_fields" must also be a json structure whose
-	#				 field names equal to the measured fields, and whose
-	#				 values must be lambda expressions or callables that
-	#				 will extract the field name data from the loaded
-	#				 raw data
-end experiment TestExperimentName
+  session_parser: lambda f: int(f.split('/')[-1][3:5])
+  file_extension: .csv
+  time_conversion_to_seconds: 1.
 
-begin experiment exp1
-	#----- DecisionModel keys -----#
-	tp: 0.
-	T: 1.
-	iti: 3.
-	dt: 0.008
-	external_var: 1000.
-	n: 101
-	reward: 1.
-	penalty: 0.
-	#----- Fitter keys -----#
-	ISI: 0.1
-	distractor: 50.
-	forced_non_decision_time: 0.
-	rt_measured_from_stim_end: False
-	time_available_to_respond: 1.
-	is_binary_confidence: False
-	#----- IO keys -----#
-	session_parser: lambda f: (int(re.search('(?<=_B)[0-9]+(?=_)',f).group())-1)//4+1
-	file_extension: .mat
-	time_conversion_to_seconds: 1e-3
-	data_structure: {"data_fields":{"contrast": "lambda x: x['trial'][:,1]",\
-									"rt": "lambda x: x['trial'][:,5]",\
-									"performance": "lambda x: x['trial'][:,7]",\
-									"confidence": "lambda x: x['trial'][:,8]",\
-									"selected_side": "lambda x: x['trial'][:,9]"}}
-end experiment exp1
-
-begin experiment exp2
-	#----- DecisionModel keys -----#
-	tp: 0.
-	T: .3
-	iti: 2.
-	dt: 0.005
-	external_var: 0.
-	n: 101
-	reward: 1.
-	penalty: 0.
-	#----- Fitter keys -----#
-	ISI: 0.5
-	distractor: 0.
-	forced_non_decision_time: 0.3
-	rt_measured_from_stim_end: True
-	is_binary_confidence: False
-	#----- IO keys -----#
-	session_parser: lambda f: int(re.search('(?<=sesion)[0-9]+',f).group())
-	file_extension: .mat
-	time_conversion_to_seconds: 1.
-	excluded_files: (.*)quest.mat
-	data_structure: {"data_fields":{"contrast": "lambda x: x['QQ'][0]",\
-									"rt": "lambda x: x['RT'][0]",\
-									"performance": "lambda x: x['correct'][0]",\
-									"confidence": "lambda x: x['SEGU'][0]",\
-									"selected_side": "lambda x: x['RTA'][0]",\
-									"confidence_rt": "lambda x: x['SEGUTIME'][0]",\
-									"target_location": "lambda x: x['orden'][0]"}}
-end experiment exp2
-
-begin experiment exp3
-	#----- DecisionModel keys -----#
-	tp: 0.
-	T: 0.3
-	iti: 1.5
-	dt: 0.005
-	external_var: 0.
-	n: 101
-	reward: 1.
-	penalty: 0.
-	#----- Fitter keys -----#
-	ISI: 0.3
-	distractor: 0.
-	forced_non_decision_time: 0.
-	rt_measured_from_stim_end: False
-	is_binary_confidence: False
-	#----- IO keys -----#
-	session_parser: lambda f: int(re.search('(?<=sesion)[0-9]+',f).group())
-	file_extension: .txt
-	time_conversion_to_seconds: 1.
-	excluded_files: (.*).dlm
-	data_structure: {"delimiter": " ",\
-					 "data_fields":{"contrast": "lambda x: np.round(x[3]*5e3)/5e3",\
-									"rt": "lambda x: x[2]",\
-									"performance": "lambda x: x[1]",\
-									"confidence": "lambda x: x[4]",\
-									"selected_side": "lambda x: x[0]",\
-									"phase": "lambda x: x[5]",\
-									"orientation": "lambda x: x[6]"}}
-end experiment exp3
+  # Order is ,choice_rt,confidence,mc,response,noise_sigma,side,correct,snum,session_num,block_num
+  data_structure:{"delimiter": ",",\
+					 "data_fields":{"rt": "lambda x: x[1][1:]",\
+									"confidence": "lambda x: x[2][1:]",\
+									"contrast": "lambda x: x[3][1:]",\
+									"variance": "lambda x: x[5][1:]",\
+									"side": "lambda x: x[6][1:]",\
+									"performance": "lambda x: x[7][1:]"}}
+end experiment ConfExp

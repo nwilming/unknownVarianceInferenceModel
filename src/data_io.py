@@ -26,7 +26,7 @@ class SubjectSession:
 	def __init__(self,session,experiment,data_dir,name=None):
 		"""
 		SubjectSession(self,session,experiment,data_dir,name=None)
-		
+
 		This class is an interface to flexible load the data from
 		Ais et al 2016 of all 3 2AFC tasks. Upon creation, a list of
 		subject names, a list of sessions and a single experiment name
@@ -34,7 +34,7 @@ class SubjectSession:
 		corresponding data experimental data is located.
 		This class can then be used to load the data of the different
 		experiments into a standarized numpy array format.
-		
+
 		Input:
 			'session': An int or list of ints with the sessions that
 				should be loaded by the created SubjectSession instance.
@@ -53,7 +53,7 @@ class SubjectSession:
 				package data_io provides a function to anonimize the
 				subjects. If None, the subject's name is inferred from
 				the directory structure.
-		
+
 		"""
 		package_logger.debug('Creating SubjectSession instance')
 		self.logger = logging.getLogger("data_io.SubjectSession")
@@ -96,56 +96,56 @@ class SubjectSession:
 		self.logger.debug("Instance's name: {0}".format(self.name))
 		self.logger.debug("Instance's data_dir: {0}".format(self.data_dir))
 		self.logger.debug("Instance's _map_data_dir_name: {0}".format(self._map_data_dir_name))
-	
+
 	def get_name(self):
 		"""
 		self.get_name()
-		
+
 		Returns a string with the subjectSession name properly converted
 		to a string.
-		
+
 		"""
 		if self._single_data_dir:
 			name = str(self.name)
 		else:
 			name = '['+'-'.join([str(n) for n in self.name])+']'
 		return name
-	
+
 	def get_session(self):
 		"""
 		self.get_session()
-		
+
 		Returns a string with the subjectSession session properly
 		converted to a string.
-		
+
 		"""
 		if self._single_session:
 			session = str(self.session)
 		else:
 			session = '['+'-'.join([str(s) for s in self.session])+']'
 		return session
-	
+
 	def get_key(self):
 		"""
 		self.get_key()
-		
+
 		Returns a string with the subjectSession key:
 		{experiment}_name={name}_session={session}
 		where {name} is taken from self.get_name() and {session} is
 		taken from self.get_session()
-		
+
 		"""
 		return '{experiment}_name={name}_session={session}'.format(experiment=self.experiment,name=self.get_name(),session=self.get_session())
-	
+
 	def get_name_from_data_dir(self,data_dir):
 		"""
 		self.get_name_from_data_dir(data_dir)
-		
+
 		Returns the name string that corresponds to the supplied data_dir.
-		
+
 		"""
 		return self._map_data_dir_name[data_dir]
-	
+
 	def get_experiment_details(self):
 		if not self.experiment in parsed_details_file['experiment_details'].keys():
 			raise ValueError('The desired experiment "{0}" is not declared in the experiment_details.txt file'.format(self.experiment))
@@ -164,16 +164,16 @@ class SubjectSession:
 		else:
 			delimiter = self.data_structure['delimiter']
 			self.raw_data_loader = lambda f: np.loadtxt(f, delimiter=delimiter, unpack=True)
-	
+
 	def change_name(self,new_name,orig=None):
 		"""
 		self.change_name(new_name,orig=None)
-		
+
 		Change the subjectSession name with the supplied new_name string.
 		If the subjectSession has a list of names associated to it, it
 		is mandatory to supply the original name which is going to be
 		replaced in the input 'orig'.
-		
+
 		"""
 		self.logger.debug('Changing name from {0} to {1}'.format(orig if not orig is None else self.name, new_name))
 		if not self._single_data_dir:
@@ -185,14 +185,14 @@ class SubjectSession:
 		else:
 			self.name = new_name
 			self._map_data_dir_name[self.data_dir] = new_name
-	
+
 	def list_data_files(self):
 		"""
 		self.list_data_files()
-		
+
 		Returns a list of the data files in the
 		os.path.join(raw_data_dir,self.data_dir) paths.
-		
+
 		"""
 		if self._single_data_dir:
 			data_dir = os.path.join(raw_data_dir,self.data_dir)
@@ -203,19 +203,19 @@ class SubjectSession:
 				data_dir = os.path.join(raw_data_dir,dd)
 				listdirs.extend([os.path.join(data_dir,f) for f in os.listdir(data_dir) if os.path.isfile(os.path.join(data_dir,f))])
 			return list(set(listdirs))
-	
+
 	def iter_data(self):
 		"""
 		self.iter_data()
-		
+
 		Iterate over the experimental data files listed in the data_dirs.
-		
+
 		Output:
 			Each yielded value is a 2D numpy.ndarray. axis=0 represent
 			different trials and axis=1 different data for each trial.
 			Refer to self.column_description to get a description of
 			the data contained at each index of axis=1.
-		
+
 		"""
 		if self._single_session:
 			if not self.excluded_files is None:
@@ -232,7 +232,7 @@ class SubjectSession:
 			name = self.get_name_from_data_dir(os.path.dirname(f).replace(raw_data_dir,''))
 			session = self.session_parser(f)
 			raw_data = self.raw_data_loader(f)
-			
+
 			mandatory_fields = ['contrast','rt','performance','confidence'] # variance is another important field if the fits are done with an unknown variance decision model
 			fields = []
 			for mf in mandatory_fields:
@@ -252,24 +252,24 @@ class SubjectSession:
 			l = len(data_dict[fields[0]])
 			if any([len(data_dict[f])!=l for f in fields[1:]]):
 				raise RuntimeError('Inconsistent size of the raw_data for file {0}. All fields must have the same number of elements'.format(f))
-			
+
 			dtype = [(str(fi),np.float) for fi in fields]
 			dtype.extend([(str('name'),str('S32')),(str('session'),np.int),(str('experiment'),str('S32'))])
 			for ind in range(l):
 				trial_data = [data_dict[field][ind] for field in fields]
 				trial_data.extend([name,session,self.experiment])
 				yield np.array(tuple(trial_data),dtype=np.dtype(dtype))
-	
+
 	def load_data(self):
 		"""
 		self.load_data()
-		
+
 		Iterates all the data using a comprehention list of
 		self.iter_data calls. Returns a numpy.ndarray where the
 		axis=0 corresponds to separate trials and the element within
 		is a structured array whose field names can be accesed by calling
 		output[0].dtype.names
-		
+
 		Output: 1D numpy.ndarray where each element is itself a structured
 			array
 			Important field names:
@@ -280,36 +280,37 @@ class SubjectSession:
 				name: corresponding data's SubjectSession name
 				session: corresponding data's SubjectSession session
 				experiment: corresponding data's SubjectSession experiment
-		
+
 		"""
 		return np.array([d for d in self.iter_data()])
-	
+
 	def __getstate__(self):
 		return {'name':self.name,'session':self.session,'experiment':self.experiment,'data_dir':self.data_dir}
-	
+
 	def __setstate__(self,state):
 		self.__init__(name=state['name'],session=state['session'],experiment=state['experiment'],data_dir=state['data_dir'])
 
 def unique_subject_sessions(filter_by_experiment=None):
 	"""
 	subjects = unique_subjects(filter_by_experiment=None)
-	
+
 	This function explores the raw_data_dir specified in the
 	experiment_details.txt file and finds the unique subjects that
 	participated in the experiment. The output is a list of anonimized
 	subjectSession instances.
-	
+
 	Input:
 		filter_by_experiment: None or a list of valid experiment names
 			that are to be stored in the output. If None, every
 			experiment encountered is stored.
-	
+
 	"""
 	package_logger.debug('Getting list of unique SubjectSession instances')
 	package_logger.debug('Input arg filter_by_experiment = {0}'.format(filter_by_experiment))
 	must_disable_and_reenable_logging = package_logger.isEnabledFor('DEBUG')
 	output = []
 	experiments = [d for d in os.listdir(raw_data_dir) if os.path.isdir(os.path.join(raw_data_dir,d))]
+	
 	for experiment in experiments:
 		if not filter_by_experiment is None and experiment not in filter_by_experiment:
 			continue
@@ -330,10 +331,10 @@ def unique_subject_sessions(filter_by_experiment=None):
 def anonimize_subjects(subjectSessions):
 	"""
 	subjectSessions = anonimize_subjects(subjectSessions)
-	
+
 	Takes a list of SubjectSession objects and converts their names into
 	a numerical id that overrides their original names.
-	
+
 	"""
 	package_logger.debug('Anonimizing {0} SubjectSession instances'.format(len(subjectSessions)))
 	names = []
@@ -358,7 +359,7 @@ def anonimize_subjects(subjectSessions):
 def filter_subjects_list(subjectSessions,criteria='all_experiments'):
 	"""
 	filter_subjects_list(subjectSessions,criteria='all_experiments')
-	
+
 	Take a list of subjectSession instances and filter it according to
 	the supplied criteria. Available criterias are:
 	'all_experiments': Remove the subjects that did not perform all of
@@ -368,9 +369,9 @@ def filter_subjects_list(subjectSessions,criteria='all_experiments'):
 		perform the maximum number of sessions for all experiments
 	'experiment_{experiment_name}': Remove all the subjectSessions with
 		an experiment not named as the supplied {experiment_name}.
-	
+
 	Output: A list of subjectSessions that satisfy the criteria.
-	
+
 	"""
 	package_logger.debug('Filtering list of SubjectSession instances using criteria: {0}'.format(criteria))
 	criteria = str(criteria)
@@ -409,7 +410,7 @@ def filter_subjects_list(subjectSessions,criteria='all_experiments'):
 def merge_subjectSessions(subjectSessions,merge='all'):
 	"""
 	merge_subjectSessions(subjectSessions,merge='all')
-	
+
 	Take a list of SubjectSession instances and merge them according to
 	the criteria specified in input merge. Available merge values:
 	'all': All the SubjectSession instances with matching experiments
@@ -418,9 +419,9 @@ def merge_subjectSessions(subjectSessions,merge='all'):
 		and sessions are merged into a single SubjectSession instance.
 	'names': All the SubjectSession instances with matching experiments
 		and names are merged into a single SubjectSession instance.
-	
+
 	Output: a list of SubjectSession instances.
-	
+
 	"""
 	package_logger.debug('Merging SubjectSession instances with merge method: {0}'.format(merge))
 	merge = merge.lower()
@@ -485,12 +486,12 @@ def merge_subjectSessions(subjectSessions,merge='all'):
 def increase_histogram_count(d,n):
 	"""
 	(out,indexes)=increase_histogram_count(d,n)
-	
+
 	Take an numpy.array of data d of shape (m,) and return an array out
 	of shape (n,) that copies the elements of d keeping d's histogram
 	approximately invariant. Second output "indexes" is an array so
 	that out = d(indexes)
-	
+
 	"""
 	d = d.squeeze()
 	if len(d.shape)>1:
@@ -499,7 +500,7 @@ def increase_histogram_count(d,n):
 		raise(ValueError('n must be larger than the length of the data'))
 	ud, ui, histogram = np.unique(d, return_inverse=True, return_counts=True)
 	increased_histogram = np.floor(histogram*n/len(d))
-	
+
 	if np.sum(increased_histogram)<n:
 		temp = np.zeros_like(histogram)
 		cumprob = np.cumsum(histogram)/sum(histogram)
@@ -507,11 +508,11 @@ def increase_histogram_count(d,n):
 			ind = np.searchsorted(cumprob,random.random(),'left')
 			temp[ind]+=1
 		increased_histogram+=temp
-	
+
 	unique_indexes = []
 	for i in range(len(ud)):
 		unique_indexes.append(np.random.permutation([j for j,uii in enumerate(ui) if uii==i]))
-	
+
 	out = np.zeros(n)
 	indexes = np.zeros_like(out,dtype=np.int)
 	count_per_value = np.zeros_like(increased_histogram)
@@ -527,10 +528,10 @@ def increase_histogram_count(d,n):
 def compute_roc(performance,confidence,partition=101):
 	"""
 	compute_roc(performance,confidence,partition=101)
-	
+
 	Compute the Receiver Operation Characteristic (ROC) curve from two
 	input arrays that hold performance (0 miss, 1 hit) and confidence.
-	
+
 	Input:
 		performance: 1D numpy array of binary performances (0 miss,
 			1 hit)
@@ -540,12 +541,12 @@ def compute_roc(performance,confidence,partition=101):
 		partition: Int that represents the number of edges that will be
 			used to partition the [0,1] confidence interval to compute
 			the ROC curves
-	
+
 	Output:
 		roc: 2D numpy array whos shape is (partition,2).
 			roc[:,0] = P(confidence<x|hit)
 			roc[:,1] = P(confidence<x|miss)
-	
+
 	"""
 	edges = np.linspace(0,1,int(partition))
 	roc = np.zeros((int(partition),2),dtype=np.float)
@@ -566,14 +567,14 @@ def compute_roc(performance,confidence,partition=101):
 def compute_auc(roc):
 	"""
 	compute_auc(roc)
-	
+
 	Compute the area under the ROC curve.
 	Input:
 		roc: A 2D numpy array as the one returned by compute_roc.
-	
+
 	Output:
 		auc: A float that is the area under the ROC curve
-	
+
 	"""
 	return scipy.integrate.trapz(roc[:,1],roc[:,0])
 
@@ -584,22 +585,22 @@ def _test():
 	except:
 		loaded_plot_libs = False
 	subjects = unique_subject_sessions()
-	
+
 	print(str(len(subjects))+' subjectSessions can be constructed found')
 	filtered_subjects = filter_subjects_list(subjects)
 	print(str(len(filtered_subjects))+' filtered subjectSessions with all_experiments criteria')
 	subjects = filter_subjects_list(subjects,'all_sessions_by_experiment')
 	print(str(len(subjects))+' filtered subjectSessions with sessions_by_experiment criteria')
-	
+
 	merged_all = merge_subjectSessions(subjects,merge='all')
 	print(str(len(merged_all))+' merged subjectSessions with merge all')
 	merged_sessions = merge_subjectSessions(subjects,merge='sessions')
 	print(str(len(merged_sessions))+' merged subjectSessions with merge sessions')
 	merged_subjects = merge_subjectSessions(subjects,merge='names')
 	print(str(len(merged_subjects))+' merged subjectSessions with merge subjects')
-	
+
 	experiments_data = {me.experiment:me.load_data() for me in merged_all}
-	
+
 	print('Successfully merged all subjects data in '+str(len([k for k in experiments_data.keys()]))+' experiments')
 	for key in experiments_data.keys():
 		data = experiments_data[key]
@@ -621,7 +622,7 @@ def _test():
 			plt.hist(data['confidence'][inds],100,normed=True)
 			plt.xlabel('confidence')
 			plt.suptitle(key)
-			
+
 			roc = compute_roc(data['performance'][inds],data['confidence'][inds])
 			auc = compute_auc(roc)
 			plt.figure()
