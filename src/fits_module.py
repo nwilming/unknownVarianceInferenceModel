@@ -408,7 +408,8 @@ _fit_output = {_fit_output}
 		dat = subjectSession.load_data()
 		self.logger.debug('Loading subjectSession data')
 		self.rt = dat['rt']
-		self.rt+=self._forced_non_decision_time
+		if self._rt_measured_from_stim_end:
+			self.rt+=self._forced_non_decision_time
 		valid_trials = self.rt<=self.rt_cutoff
 		self.rt = self.rt[valid_trials]
 		self.max_RT = np.max(self.rt)
