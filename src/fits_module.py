@@ -16,7 +16,7 @@ from __future__ import division, print_function, absolute_import, unicode_litera
 import enum, os, sys, math, scipy, pickle, warnings, json, logging, logging.config, copy, re
 import scipy.signal
 import numpy as np
-from utils import normpdf,average_downsample,parse_details_file
+from utils import normpdf,average_downsample,parse_details_file,unique_rows
 
 try:
 	with warnings.catch_warnings():
@@ -427,8 +427,8 @@ _fit_output = {_fit_output}
 				self.external_var = dat['variance']/self._ISI
 			except:
 				raise RuntimeError('Cannot perform fits for unknown variance DecisionModel if the data does not have a "variance" field')
-			self.unique_stim,self.stim_indeces,counts = utils.unique_rows(np.array([self.contrast,self.external_var]).T,return_inverse=True,return_counts=True)
-			self.stim_probs = count.astype(np.float64)/np.sum(count.astype(np.float64))
+			self.unique_stim,self.stim_indeces,counts = unique_rows(np.array([self.contrast,self.external_var]).T,return_inverse=True,return_counts=True)
+			self.stim_prob = counts.astype(np.float64)/np.sum(counts.astype(np.float64))
 		self.logger.debug('Trials loaded = %d',len(self.performance))
 		self.mu,self.mu_indeces,count = np.unique(self.contrast,return_inverse=True,return_counts=True)
 		self.logger.debug('Number of different drifts = %d',len(self.mu))
@@ -1015,31 +1015,38 @@ _fit_output = {_fit_output}
 				raise Exception('Forcing recompute')
 			return self.__default_start_point__
 		except:
+			self.logger.debug('Computing default start point for all parameters')
 			if hasattr(self,'_fixed_parameters'):
 				self.__default_start_point__ = self._fixed_parameters.copy()
 			else:
 				self.__default_start_point__ = {}
 			if not 'cost' in self.__default_start_point__.keys() or self.__default_start_point__['cost'] is None:
 				self.__default_start_point__['cost'] = 0.02
+				self.logger.debug('Default cost set to {0}'.format(self.__default_start_point__['cost']))
 			if not 'internal_var' in self.__default_start_point__.keys() or self.__default_start_point__['internal_var'] is None:
 				try:
 					from scipy.optimize import minimize
 					with warnings.catch_warnings():
 						warnings.simplefilter("ignore")
 						if self.dm.known_variance():
+							self.logger.debug('Starting to adjust performance with psychometric curve for known variance')
 							fun = lambda a: (np.mean(self.performance)-np.sum(self.mu_prob/(1.+np.exp(-0.596*self.mu/a))))**2
 						else:
-							fun = lambda a: (np.mean(self.performance)-np.sum(self.stim_prob/(1.+np.exp(-0.596*self.unique_stims[:,0]/np.sqrt(self.unique_stims[:,1]+a**2)))))**2
+							self.logger.debug('Starting to adjust performance with psychometric curve for unknown variance')
+							fun = lambda a: (np.mean(self.performance)-np.sum(self.stim_prob/(1.+np.exp(-0.596*self.unique_stim[:,0]/np.sqrt(self.unique_stim[:,1]+a**2)))))**2
 						res = minimize(fun,1000.,method='Nelder-Mead')
 					self.__default_start_point__['internal_var'] = res.x[0]**2
 				except Exception as e:
 					self.logger.warning('Could not fit internal_var from data')
 					self.__default_start_point__['internal_var'] = 1500.
+				self.logger.debug('Default internal_var set to {0}'.format(self.__default_start_point__['internal_var']))
 			if not 'phase_out_prob' in self.__default_start_point__.keys() or self.__default_start_point__['phase_out_prob'] is None:
 				self.__default_start_point__['phase_out_prob'] = 0.05
+				self.logger.debug('Default phase_out_prob set to {0}'.format(self.__default_start_point__['phase_out_prob']))
 			if not 'dead_time' in self.__default_start_point__.keys() or self.__default_start_point__['dead_time'] is None:
 				dead_time = sorted(self.rt)[int(0.025*len(self.rt))]
 				self.__default_start_point__['dead_time'] = dead_time
+				self.logger.debug('Default dead_time set to {0}'.format(self.__default_start_point__['dead_time']))
 			if not 'confidence_map_slope' in self.__default_start_point__.keys() or self.__default_start_point__['confidence_map_slope'] is None:
 				if self.confidence_mapping_method=='log_odds':
 					self.__default_start_point__['confidence_map_slope'] = 17.2
@@ -1047,20 +1054,37 @@ _fit_output = {_fit_output}
 					self.__default_start_point__['confidence_map_slope'] = 1.
 				else:
 					raise ValueError('Unknown confidence_mapping_method: {0}'.format(self.confidence_mapping_method))
+				self.logger.debug('Default confidence_map_slope set to {0}'.format(self.__default_start_point__['confidence_map_slope']))
 			
 			must_make_expensive_guess = ((not 'dead_time_sigma' in self.__default_start_point__.keys()) or\
 										((not 'high_confidence_threshold' in self.__default_start_point__.keys()) and self.method!='full'))
 			if must_make_expensive_guess:
+				self.logger.debug('Making expensive guess for dead_time_sigma and/or high_confidence_threshold')
 				self.dm.set_cost(self.__default_start_point__['cost'])
 				self.dm.set_internal_var(self.__default_start_point__['internal_var'])
 				xub,xlb = self.dm.xbounds()
 				first_passage_pdf = None
-				for drift,drift_prob in zip(self.mu,self.mu_prob):
-					gs = np.array(self.dm.fpt(drift,bounds=(xub,xlb)))
-					if first_passage_pdf is None:
-						first_passage_pdf = gs*drift_prob
-					else:
-						first_passage_pdf+= gs*drift_prob
+				if self.dm.known_variance():
+					self.logger.debug('Computing first_passage_pdf for known variance decision model')
+					for index,(drift,drift_prob) in enumerate(zip(self.mu,self.mu_prob)):
+						self.logger.debug('{0}/{1}   stim={2}   prob={3}'.format(index+1,len(self.mu),drift,drift_prob))
+						gs = np.array(self.dm.fpt(drift,bounds=(xub,xlb)))
+						if first_passage_pdf is None:
+							first_passage_pdf = gs*drift_prob
+						else:
+							first_passage_pdf+= gs*drift_prob
+				else:
+					self.logger.debug('Computing first_passage_pdf for unknown variance decision model')
+					for index,stim in enumerate(self.unique_stim):
+						self.logger.debug('{0}/{1}   stim={2}   prob={3}'.format(index+1,len(self.unique_stim),stim,self.stim_prob[index]))
+						drift = stim[0]
+						external_var = stim[1]
+						total_var = external_var + self.dm.internal_var
+						gs = np.array(self.dm.fpt(drift,total_var,bounds=(xub,xlb)))
+						if first_passage_pdf is None:
+							first_passage_pdf = gs*self.stim_prob[index]
+						else:
+							first_passage_pdf+= gs*self.stim_prob[index]
 				first_passage_pdf/=(np.sum(first_passage_pdf)*self.dm.dt)
 				
 				if not 'dead_time_sigma' in self.__default_start_point__.keys() or self.__default_start_point__['dead_time_sigma'] is None:
@@ -1072,6 +1096,7 @@ _fit_output = {_fit_output}
 						self.__default_start_point__['dead_time_sigma'] = np.max([np.sqrt(var_rt-var_pdf),min_dead_time_sigma_sp])
 					else:
 						self.__default_start_point__['dead_time_sigma'] = min_dead_time_sigma_sp
+					self.logger.debug('Default dead_time_sigma set to {0}'.format(self.__default_start_point__['dead_time_sigma']))
 				
 				rt_mode_ind = np.argmax(first_passage_pdf[0])
 				rt_mode_ind+= 4 if self.dm.nT-rt_mode_ind>4 else 0
@@ -1083,8 +1108,11 @@ _fit_output = {_fit_output}
 						bounds = self.dm.bounds
 						self.__default_start_point__['high_confidence_threshold'] = 2*self.dm.bounds[0][rt_mode_ind]-1
 			else:
+				self.logger.debug('Not forced to make expensive guess for high_confidence_threshold')
 				if not 'high_confidence_threshold' in self.__default_start_point__.keys() or self.__default_start_point__['high_confidence_threshold'] is None:
 					self.__default_start_point__['high_confidence_threshold'] = 0.3
+			self.logger.debug('Default high_confidence_threshold set to {0}'.format(self.__default_start_point__['high_confidence_threshold']))
+			self.logger.debug('Finished computing default start point = {0}'.format(self.__default_start_point__))
 			
 			return self.__default_start_point__
 	

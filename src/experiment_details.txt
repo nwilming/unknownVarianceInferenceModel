@@ -123,3 +123,41 @@ begin experiment exp3
 									"phase": "lambda x: x[5]",\
 									"orientation": "lambda x: x[6]"}}
 end experiment exp3
+
+begin experiment ConfExp
+	#----- DecisionModel keys -----#
+	tp: 0.
+	T: 5.
+	iti: 3.
+	dt: 1e-3
+	reward: 1
+	penalty: 0
+	n: 101
+	# external_var can be a float or a list of floats (e.g. [10.,20.,30.])
+	external_var: [0.5,1.,1.5] # The external_var units must be stimulus variance over time (e.g. contrast**2/s).
+	# prior_var_prob is only used if external_var is a list.
+	# It represents the prior probability of each variance.
+	# The probabilities are normalized when they are loaded.
+	prior_var_prob: [0.3,0.3,0.3]
+	#----- Fitter keys -----#
+	ISI: 0.1
+	rt_cutoff: 14.
+	distractor: 0.
+	forced_non_decision_time: 0.
+	rt_measured_from_stim_end: True # If False, rt are measured from stim start. If True, they are measured from the stim end
+	time_available_to_respond: inf
+	is_binary_confidence: True # Can be True or False to indicate if the confidence data is binary or not
+	#----- IO keys -----#
+  session_parser: lambda f: int(f.split('/')[-1][3:5])
+  file_extension: .csv
+  time_conversion_to_seconds: 1.
+
+  # Order is ,choice_rt,confidence,mc,response,noise_sigma,side,correct,snum,session_num,block_num
+  data_structure:{"delimiter": ",",\
+					 "data_fields":{"rt": "lambda x: x[1][1:]",\
+									"confidence": "lambda x: x[2][1:]",\
+									"contrast": "lambda x: x[3][1:]",\
+									"variance": "lambda x: x[5][1:]",\
+									"side": "lambda x: x[6][1:]",\
+									"performance": "lambda x: x[7][1:]"}}
+end experiment ConfExp
