@@ -425,12 +425,14 @@ _fit_output = {_fit_output}
 		self.performance = dat['performance']
 		self.confidence = dat['confidence']
 		if not self.dm.known_variance():
+                        print('Unknown variance model')
 			try:
 				self.external_var = dat['variance']/self._ISI
 			except:
 				raise RuntimeError('Cannot perform fits for unknown variance DecisionModel if the data does not have a "variance" field')
 			self.unique_stim,self.stim_indeces,count = utils.unique_rows(np.array([self.contrast,self.external_var]).T,return_inverse=True,return_counts=True)
-			self.stim_probs = count.astype(np.float64)/np.sum(count.astype(np.float64))
+                        
+			self.stim_prob = count.astype(np.float64)/np.sum(count.astype(np.float64))
 		self.logger.debug('Trials loaded = %d',len(self.performance))
 		self.mu,self.mu_indeces,count = np.unique(self.contrast,return_inverse=True,return_counts=True)
 		self.logger.debug('Number of different drifts = %d',len(self.mu))
