@@ -10,6 +10,9 @@
 # Python pickles
 *.pkl
 
+# Csv files
+*.csv
+
 # Matlab .mat files
 *.mat
 
