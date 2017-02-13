@@ -16,7 +16,8 @@ from __future__ import division, print_function, absolute_import, unicode_litera
 import enum, os, sys, math, scipy, pickle, warnings, json, logging, logging.config, copy, re
 import scipy.signal
 import numpy as np
-from utils import normpdf,average_downsample,parse_details_file,unique_rows
+from utils import normpdf,average_downsample,parse_details_file
+import utils
 
 try:
 	with warnings.catch_warnings():
@@ -428,8 +429,9 @@ _fit_output = {_fit_output}
 				self.external_var = dat['variance']/self._ISI
 			except:
 				raise RuntimeError('Cannot perform fits for unknown variance DecisionModel if the data does not have a "variance" field')
-			self.unique_stim,self.stim_indeces,counts = unique_rows(np.array([self.contrast,self.external_var]).T,return_inverse=True,return_counts=True)
-			self.stim_prob = counts.astype(np.float64)/np.sum(counts.astype(np.float64))
+			self.unique_stim,self.stim_indeces,count = utils.unique_rows(np.array([self.contrast,self.external_var]).T,return_inverse=True,return_counts=True)
+                        
+			self.stim_prob = count.astype(np.float64)/np.sum(count.astype(np.float64))
 		self.logger.debug('Trials loaded = %d',len(self.performance))
 		self.mu,self.mu_indeces,count = np.unique(self.contrast,return_inverse=True,return_counts=True)
 		self.logger.debug('Number of different drifts = %d',len(self.mu))
