@@ -3,7 +3,7 @@
 begin experiment ConfExp
 	#----- DecisionModel keys -----#
 	tp: 0.
-	T: 5.
+	T: 1.
 	iti: 3.
 	dt: 1e-3
 	reward: 1
@@ -30,6 +30,7 @@ begin experiment ConfExp
 
   # Order is ,choice_rt,confidence,mc,response,noise_sigma,side,correct,snum,session_num,block_num
   data_structure:{"delimiter": ",",\
+
 					 "data_fields":{"rt": "lambda x: x[1][1:]",\
 									"confidence": "lambda x: x[2][1:]-1",\
 									"contrast": "lambda x: x[3][1:]",\
